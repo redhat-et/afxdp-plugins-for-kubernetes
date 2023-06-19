@@ -415,6 +415,10 @@ BpfMapPinningEnable is a Boolean configuration. If set to true, will use BPF map
 
 > **_NOTE:_**  If the kernel is <= 5.18, CAP_BPF capability should be added to the container in the Pod.
 
+#### BpdClientEnable
+
+TODO, remember to disable local BPF bits if this is enabled...
+
 #### UdsTimeout
 
 UdsTimeout is an integer configuration. This value sets the amount of time, in seconds, that the UDS server will wait while there is no activity on the UDS. When this timeout limit is reached, the UDS server terminates and the UDS is deleted from the filesystem. This can be a useful setting, for example, in scenarios where large batches of pods are created together. Large batches of pods tend to take some time to spin up, so it might be beneficial to have the UDS server sit waiting a little longer for the pod to start. The maximum allowed value is 300 seconds (5 min). The minimum and default value is 30 seconds.

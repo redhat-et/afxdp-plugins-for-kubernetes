@@ -23,6 +23,7 @@ import (
 
 	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpfd"
 	pb "github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncer"
 	"github.com/pkg/errors"
 	logging "github.com/sirupsen/logrus"
@@ -41,9 +42,11 @@ var (
 
 type SyncerServer struct {
 	pb.UnimplementedNetDevServer
-	mapManagers     []bpf.PoolBpfMapManager
-	grpcServer      *grpc.Server
-	BpfMapPinEnable bool
+	mapManagers      []bpf.PoolBpfMapManager
+	grpcServer       *grpc.Server
+	BpfdClientEnable bool
+	BpfdClient       *bpfd.BpfdClient
+	BpfMapPinEnable  bool
 }
 
 func (s *SyncerServer) RegisterMapManager(b bpf.PoolBpfMapManager) {
@@ -62,9 +65,8 @@ func (s *SyncerServer) RegisterMapManager(b bpf.PoolBpfMapManager) {
 
 func (s *SyncerServer) DelNetDev(ctx context.Context, in *pb.DeleteNetDevReq) (*pb.DeleteNetDevResp, error) {
 
-	if s.BpfMapPinEnable {
+	if !s.BpfdClientEnable && s.BpfMapPinEnable {
 		netDevName := in.GetName()
-
 		logging.Infof("Looking up Map Manager for %s", netDevName)
 		found := false
 		var pm bpf.PoolBpfMapManager

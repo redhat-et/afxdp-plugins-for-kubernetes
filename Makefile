@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+KIND_CLUSTER_NAME ?= af-xdp-deployment
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -218,30 +218,74 @@ setup-multus: ## Setup multus
 
 ##@ Kind Deployment - sets up a kind cluster and deploys the plugin and CNI
 
-.PHONY: del-kind
-del-kind: ## Remove a kind cluster called af-xdp-deployment
-	kind delete cluster --name af-xdp-deployment
+.PHONY: kind-del
+kind-del: ## Remove a kind cluster called af-xdp-deployment
+	kind delete cluster --name ${KIND_CLUSTER_NAME}
 
-.PHONY: setup-kind
-setup-kind: del-kind ## Setup a kind cluster called af-xdp-deployment
+.PHONY: kind-setup
+kind-setup: kind-del ## Setup a kind cluster called af-xdp-deployment
 	mkdir -p /tmp/afxdp_dp/
 	mkdir -p /tmp/afxdp_dp2/
-	kind create cluster --config hack/kind-config.yaml --name af-xdp-deployment
+	kind create cluster --config hack/kind-config.yaml --name ${KIND_CLUSTER_NAME}
 
-.PHONY: label-kind-nodes
-label-kind-nodes: ## label the kind worker nodes with cndp="true"
-	kubectl label node af-xdp-deployment-worker cndp="true"
-	kubectl label node af-xdp-deployment-worker2 cndp="true"
+.PHONY: kind-label-nodes
+kind-label-nodes: ## Label the kind worker nodes with cndp="true"
+	kubectl label node ${KIND_CLUSTER_NAME}-worker cndp="true"
+	kubectl label node ${KIND_CLUSTER_NAME}-worker2 cndp="true"
+
+.PHONY: kind-load-images
+kind-load-images:  ## Load the image on the kind cluster
+	@echo "****** Loading AF_XDP DEVICE PLUGIN image  ******"
+	@echo
+	kind load --name ${KIND_CLUSTER_NAME} docker-image afxdp-device-plugin
+	@echo
+	@echo
+
+# make KIND_CLUSTER_NAME=bpfd-deployment IMAGE=quay.io/mtahhan/cndp-map-pinning kind-load-custom-image
+.PHONY: kind-load-custom-image
+kind-load-custom-image:  ## Load the image on the kind cluster
+	@echo "****** Loading ${IMAGE}  ******"
+	@echo
+	kind load --name ${KIND_CLUSTER_NAME} docker-image ${IMAGE}
+	@echo
+	@echo
+
+.PHONY: kind-reload-images
+kind-reload-images: kind-load-images ## Reload locally built images into a kind cluster and restart the daemonset so they're picked up.
+	kubectl rollout restart daemonset kube-afxdp-device-plugin -n kube-system
+
+kind-undeploy: ## Undeploy the Kind Deamonset
+	@echo "******  Stop Daemonset   ******"
+	@echo
+	kubectl delete -f ./deployments/daemonset-kind.yaml --ignore-not-found=true
+	@echo
+	@echo
 
 .PHONY: kind-deploy
-kind-deploy: image undeploy ## Deploy the Deamonset and CNI in Kind
+kind-deploy: kind-undeploy kind-load-images ## Deploy the Deamonset and CNI in Kind
 	@echo "****** Deploy Daemonset  ******"
 	@echo
-	kind load --name af-xdp-deployment docker-image afxdp-device-plugin
 	kubectl create -f ./deployments/daemonset-kind.yaml
 	@echo
 	@echo
 
+# make KIND_CLUSTER_NAME=bpfd-deployment kind-undeploy-bpfd
+kind-undeploy-bpfd: ## Undeploy the Kind Deamonset
+	@echo "******  Stop Daemonset   ******"
+	@echo
+	kubectl delete -f ./deployments/daemonset-kind-bpfd.yaml --ignore-not-found=true
+	@echo
+	@echo
+
+# make KIND_CLUSTER_NAME=bpfd-deployment kind-deploy-bpfd
+.PHONY: kind-deploy-bpfd
+kind-deploy-bpfd: kind-undeploy-bpfd kind-load-images ## Deploy the Deamonset and CNI in Kind
+	@echo "****** Deploy Daemonset  ******"
+	@echo
+	kubectl create -f ./deployments/daemonset-kind-bpfd.yaml
+	@echo
+	@echo
+
 .PHONY: run-on-kind
-run-on-kind: del-kind setup-kind label-kind-nodes setup-multus kind-deploy ## Setup a kind cluster and deploy the device plugin
+run-on-kind: kind-del kind-setup kind-label-nodes setup-multus kind-deploy ## Setup a kind cluster and deploy the device plugin
 	@echo "******       Kind Setup complete       ******"

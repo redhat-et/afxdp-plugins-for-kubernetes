@@ -48,6 +48,7 @@ func TestAllocate(t *testing.T) {
 		},
 		UdsServerDisable:        false,
 		BpfMapPinningEnable:     false,
+		BpfdClientEnable:        false,
 		UdsTimeout:              0,
 		UdsFuzz:                 false,
 		RequiresUnprivilegedBpf: false,

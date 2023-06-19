@@ -17,6 +17,7 @@
 package deviceplugin
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpfd"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/tools"
@@ -44,12 +46,14 @@ Each PoolManager registers with Kubernetes as a different device type.
 type PoolManager struct {
 	Name                string
 	Mode                string
+	Node                string
 	Devices             map[string]*networking.Device
 	UpdateSignal        chan bool
 	DpAPISocket         string
 	DpAPIEndpoint       string
 	UdsServerDisable    bool
 	BpfMapPinningEnable bool
+	BpfdClientEnable    bool
 	UdsTimeout          int
 	DevicePrefix        string
 	UdsFuzz             bool
@@ -64,6 +68,7 @@ type PoolManager struct {
 	DpCniSyncerSocket   string
 	SyncerActive        bool
 	Pbm                 bpf.PoolBpfMapManager
+	BpfdClient          *bpfd.BpfdClient
 }
 
 func NewPoolManager(config PoolConfig) PoolManager {
@@ -76,12 +81,14 @@ func NewPoolManager(config PoolConfig) PoolManager {
 		DpAPIEndpoint:       constants.Plugins.DevicePlugin.DevicePrefix + "-" + config.Name + ".sock",
 		UdsServerDisable:    config.UdsServerDisable,
 		BpfMapPinningEnable: config.BpfMapPinningEnable,
+		BpfdClientEnable:    config.BpfdClientEnable,
 		UdsTimeout:          config.UdsTimeout,
 		DevicePrefix:        constants.Plugins.DevicePlugin.DevicePrefix,
 		UdsFuzz:             config.UdsFuzz,
 		UID:                 strconv.Itoa(config.UID),
 		EthtoolFilters:      config.EthtoolCmds,
 		DpCniSyncerServer:   config.DPCNIServer,
+		Node:                os.Getenv("HOSTNAME"),
 	}
 }
 
@@ -110,13 +117,23 @@ func (pm *PoolManager) Init(config PoolConfig) error {
 		logging.Infof("Creating new BPF Map manager %s %s", pm.Name, pm.UID)
 		pm.Pbm.Manager, err = pm.MapManagerFactory.CreateMapManager(pm.Name, pm.UID)
 		if err != nil {
-			logging.Errorf("Error new BPF Map manager: %v", err)
+			logging.Errorf("Error creating new BPF Map manager: %v", err)
 			return err
 		}
 
 		logging.Debug("REGISTER MAP MANAGER WITH THE DP<=>CNI grpc Syncer")
 		pm.DpCniSyncerServer.RegisterMapManager(pm.Pbm)
 		pm.DpCniSyncerServer.BpfMapPinEnable = true
+	}
+
+	if pm.BpfdClientEnable {
+		pm.BpfdClient = bpfd.NewBpfdClient()
+		if pm.BpfdClient == nil {
+			return errors.New("problem creating bpfd client")
+		}
+
+		pm.DpCniSyncerServer.BpfdClientEnable = true
+		pm.DpCniSyncerServer.BpfdClient = pm.BpfdClient
 	}
 
 	if len(pm.Devices) > 0 {
@@ -278,6 +295,16 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 					ContainerPath: containerMapPath,
 					ReadOnly:      false,
 				})
+			}
+
+			if pm.BpfdClientEnable {
+
+				err := pm.BpfdClient.SubmitXdpProg(device.Name(), pm.Node, pm.DevicePrefix)
+				if err != nil {
+					logging.Errorf("Error SubmitXdpProg to bpfd %v", err)
+					return &response, err
+				}
+
 			}
 		}
 
