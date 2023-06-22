@@ -58,25 +58,19 @@ func NewBpfdClient() *BpfdClient {
 	return bc
 }
 
-func (b *BpfdClient) GetXdpProgs() error {
+func (b *BpfdClient) GetXdpProgs() (*bpfdiov1alpha1.XdpProgramList, error) {
 	// Get the xdp program resources
 	xdpProgramList, err := b.xdpProgramsClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "Failed to retrieve the xdp program resources: %v", err.Error())
+		return nil, errors.Wrapf(err, "Failed to retrieve the xdp program resources: %v", err.Error())
 	}
 
 	if len(xdpProgramList.Items) == 0 {
 		logging.Infof("No XDP programs found\n")
-		return nil
+		return nil, nil
 	}
 
-	logging.Infof("Retrieved XdpProgram resources:\n")
-	for _, xdpProgram := range xdpProgramList.Items {
-		//logging.Infof("%s\n", xdpProgram.Spec.BpfProgramCommon.SectionName)
-		logging.Infof("%s\n", xdpProgram.ObjectMeta.Name)
-	}
-
-	return nil
+	return xdpProgramList, nil
 }
 
 func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
@@ -125,7 +119,7 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
 	logging.Infof("Created XdpProgram resource:\n%v\n", result)
 
 	time.Sleep(time.Second)
-	err = b.getProgStatus(name)
+	_, err = b.checkProgStatus(name)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create XdpProgram resource: %v", err)
 	}
@@ -145,12 +139,27 @@ func (b *BpfdClient) DeleteXdpProg(iface string) error {
 		return errors.Wrapf(err, "Failed to delete XdpProgram resource: %v", err)
 	}
 
+	time.Sleep(time.Second)
+	logging.Infof("Check resource status after deletion:\n%s\n", name)
+
+	xdpProgramList, err := b.GetXdpProgs()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get xpd prog resources: %v", err)
+	}
+
+	for _, xdpProgram := range xdpProgramList.Items {
+		if name == xdpProgram.ObjectMeta.Name {
+			logging.Errorf("%s resource wasn't deleted\n", xdpProgram.ObjectMeta.Name)
+			return errors.New("FAILED TO DELETE RESOURCE")
+		}
+	}
+
 	logging.Infof("Deleted XdpProgram resource:\n%s\n", name)
 
 	return nil
 }
 
-func (b *BpfdClient) getProgStatus(name string) error {
+func (b *BpfdClient) checkProgStatus(name string) (string, error) {
 
 	selector := metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -158,16 +167,15 @@ func (b *BpfdClient) getProgStatus(name string) error {
 		},
 	}
 
-	// Create a watcher to wait for status update
+	// Create a watcher to wait for a successful status
 	xdpWatcher, err := b.xdpProgramsClient.Watch(context.TODO(),
 		metav1.ListOptions{
 			LabelSelector: labels.Set(selector.MatchLabels).String(),
-			//FieldSelector: fields.Set{"Status.Conditions.Type": BpfProgCondLoaded}.AsSelector().String(), //"Status.Conditions.Type=Loaded",
 			FieldSelector: fields.Set{"metadata.name": name}.AsSelector().String(),
 			Watch:         true,
 		})
 	if err != nil {
-		return errors.Wrapf(err, "Failed to watch XdpProgram resource: %v", err)
+		return "", errors.Wrapf(err, "Failed to watch XdpProgram resource: %v", err)
 	}
 
 	defer xdpWatcher.Stop()
@@ -178,13 +186,13 @@ func (b *BpfdClient) getProgStatus(name string) error {
 		if !ok {
 			// channel closed
 			logging.Errorf("Channel closed")
-			return errors.New("Failed to load xdp program")
+			return "", errors.New("Channel Closed")
 		}
 
 		prog, ok := event.Object.(*bpfdiov1alpha1.XdpProgram)
 		if !ok {
 			logging.Errorf("couldn't get xdp prog object")
-			return errors.New("Failed to load xdp program")
+			return "", errors.New("Failed to get xdp prog object")
 		}
 
 		logging.Infof("\n%v", prog.Status)
@@ -198,7 +206,7 @@ func (b *BpfdClient) getProgStatus(name string) error {
 		case ProgramReconcileSuccess:
 			// return success
 			logging.Infof("Bpf program Loaded %v", condition.Type)
-			return nil
+			return "success", nil
 		default:
 			logging.Infof("Bpf program status %v", condition.Type)
 		}
@@ -206,5 +214,5 @@ func (b *BpfdClient) getProgStatus(name string) error {
 		time.Sleep(1 * time.Second)
 	}
 
-	return errors.New("Failed to load xdp program")
+	return "", errors.New("Failed to load xdp program")
 }
