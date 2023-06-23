@@ -27,9 +27,13 @@ var (
 	devicePluginExitHostError     = 3                          // device plugin host check exit code, error occurred checking some attribute of the host
 	devicePluginExitPoolError     = 4                          // device plugin device pool exit code, error occurred while building a device pool
 	devicePluginExitKindError     = 5                          // device plugin Kind exit code, error occurred while creating a kind secondary network
+	devicePluginExitBpfdError     = 6                          // device plugin bpfd exit code, error occurred while creating a bpfd client
 
 	/* Kind Cluster */
 	kindCluster = false
+
+	/* bpfd Client Enable*/
+	bpfdClientEnable = false
 
 	/* Logging */
 	logLevels          = []string{"debug", "info", "warning", "error"} // accepted log levels
@@ -151,13 +155,15 @@ type devicePlugin struct {
 	ExitHostError     int
 	ExitPoolError     int
 	ExitKindError     int
+	ExitBpfdError     int
 }
 
 type plugins struct {
-	Modes        []string
-	Cni          cni
-	DevicePlugin devicePlugin
-	KindCluster  bool
+	Modes            []string
+	Cni              cni
+	DevicePlugin     devicePlugin
+	KindCluster      bool
+	bpfdClientEnable bool
 }
 
 type afxdp struct {
@@ -258,8 +264,9 @@ type ethtoolFilter struct {
 
 func init() {
 	Plugins = plugins{
-		Modes:       pluginModes,
-		KindCluster: kindCluster,
+		Modes:            pluginModes,
+		KindCluster:      kindCluster,
+		bpfdClientEnable: bpfdClientEnable,
 		DevicePlugin: devicePlugin{
 			DefaultConfigFile: devicePluginDefaultConfigFile,
 			DevicePrefix:      devicePluginDevicePrefix,

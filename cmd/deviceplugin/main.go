@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
+	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpfd"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/deviceplugin"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
@@ -105,9 +106,27 @@ func main() {
 	}
 	logging.Debugf("DP<=>CNI grpc Syncer started")
 
+	var bpfdClient *bpfd.BpfdClient
+	bpfdClient = nil
+	dpCniSyncerServer.BpfdClientEnable = false
+	dpCniSyncerServer.BpfdClient = nil
+	if cfg.BpfdClientEnable {
+		bpfdClient = bpfd.NewBpfdClient()
+		if bpfdClient == nil {
+			logging.Errorf("Error creating the bpfd client")
+			exit(constants.Plugins.DevicePlugin.ExitBpfdError)
+		}
+
+		logging.Debug("BpfdClientEnable for DpCniSyncerServer")
+		dpCniSyncerServer.BpfdClientEnable = true
+		dpCniSyncerServer.BpfdClient = bpfdClient
+	}
+
+	//SETUP BPFD KIND PEER veth TODO
+
 	// pool configs
 	logging.Infof("Getting device pools")
-	poolConfigs, err := deviceplugin.GetPoolConfigs(configFile, netHandler, hostHandler, dpCniSyncerServer)
+	poolConfigs, err := deviceplugin.GetPoolConfigs(configFile, netHandler, hostHandler, dpCniSyncerServer, bpfdClient)
 	if err != nil {
 		logging.Warningf("Error getting device pools: %v", err)
 		exit(constants.Plugins.DevicePlugin.ExitPoolError)

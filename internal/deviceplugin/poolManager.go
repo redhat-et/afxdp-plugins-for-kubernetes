@@ -17,7 +17,6 @@
 package deviceplugin
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -88,6 +87,7 @@ func NewPoolManager(config PoolConfig) PoolManager {
 		UID:                 strconv.Itoa(config.UID),
 		EthtoolFilters:      config.EthtoolCmds,
 		DpCniSyncerServer:   config.DPCNIServer,
+		BpfdClient:          config.BPFDClient,
 		Node:                os.Getenv("HOSTNAME"),
 	}
 }
@@ -124,16 +124,6 @@ func (pm *PoolManager) Init(config PoolConfig) error {
 		logging.Debug("REGISTER MAP MANAGER WITH THE DP<=>CNI grpc Syncer")
 		pm.DpCniSyncerServer.RegisterMapManager(pm.Pbm)
 		pm.DpCniSyncerServer.BpfMapPinEnable = true
-	}
-
-	if pm.BpfdClientEnable {
-		pm.BpfdClient = bpfd.NewBpfdClient()
-		if pm.BpfdClient == nil {
-			return errors.New("problem creating bpfd client")
-		}
-
-		pm.DpCniSyncerServer.BpfdClientEnable = true
-		pm.DpCniSyncerServer.BpfdClient = pm.BpfdClient
 	}
 
 	if len(pm.Devices) > 0 {

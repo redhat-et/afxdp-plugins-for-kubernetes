@@ -147,10 +147,13 @@ func (b *BpfdClient) DeleteXdpProg(iface string) error {
 		return errors.Wrapf(err, "Failed to get xpd prog resources: %v", err)
 	}
 
-	for _, xdpProgram := range xdpProgramList.Items {
-		if name == xdpProgram.ObjectMeta.Name {
-			logging.Errorf("%s resource wasn't deleted\n", xdpProgram.ObjectMeta.Name)
-			return errors.New("FAILED TO DELETE RESOURCE")
+	// xdpProgramList can be nil if there are no xpd program resources
+	if xdpProgramList != nil {
+		for _, xdpProgram := range xdpProgramList.Items {
+			if name == xdpProgram.ObjectMeta.Name {
+				logging.Errorf("%s resource wasn't deleted\n", xdpProgram.ObjectMeta.Name)
+				return errors.New("FAILED TO DELETE RESOURCE")
+			}
 		}
 	}
 

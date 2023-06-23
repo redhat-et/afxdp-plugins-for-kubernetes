@@ -97,10 +97,11 @@ type configFile_Pool struct {
 }
 
 type configFile struct {
-	Pools       []*configFile_Pool `json:"Pools"`
-	LogFile     string             `json:"LogFile"`
-	LogLevel    string             `json:"LogLevel"`
-	KindCluster bool               `json:"kindCluster"`
+	Pools            []*configFile_Pool `json:"Pools"`
+	LogFile          string             `json:"LogFile"`
+	LogLevel         string             `json:"LogLevel"`
+	KindCluster      bool               `json:"kindCluster"`
+	BpfdClientEnable bool               `json:"bpfdClientEnable"`
 }
 
 func (c configFile_Device) Validate() error {

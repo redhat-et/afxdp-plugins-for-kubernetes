@@ -544,6 +544,10 @@ From the [examples/network-attachment-definition.yaml](./examples/network-attach
 
 *Note: When setting ethtool commands in the **ethtoolCmds** field, the 'ethtool' prefix must be removed.
 
+### bpfd Client
+
+TODO
+
 ## CLOC
 
 Output from CLOC (count lines of code) - github.com/AlDanial/cloc

@@ -9,12 +9,12 @@ data:
        "kindCluster": true,
        "logLevel":"debug",
        "logFile":"afxdp-dp.log",
+       "bpfdClientEnable": true,
        "pools":[
           {
             "name":"myPool",
             "mode":"primary",
             "UdsServerDisable": true,
-            "BpfdClientEnable": true,
             "drivers":[
               {
                 "name":"veth"

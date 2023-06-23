@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
+	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpfd"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
 	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
@@ -32,11 +33,13 @@ import (
 )
 
 var (
-	network     networking.Handler
-	node        host.Handler
-	dpcniserver *dpcnisyncerserver.SyncerServer
-	cfgFile     *configFile
-	hostDevices map[string]*networking.Device
+	network          networking.Handler
+	node             host.Handler
+	dpcniserver      *dpcnisyncerserver.SyncerServer
+	cfgFile          *configFile
+	hostDevices      map[string]*networking.Device
+	bpfdClient       *bpfd.BpfdClient
+	bpfdClientEnable bool
 )
 
 /*
@@ -44,9 +47,10 @@ PluginConfig is the object that represents the overall plugin config.
 Global configurations such as log levels are contained here.
 */
 type PluginConfig struct {
-	LogFile     string
-	LogLevel    string
-	KindCluster bool
+	LogFile          string
+	LogLevel         string
+	KindCluster      bool
+	BpfdClientEnable bool
 }
 
 /*
@@ -67,6 +71,7 @@ type PoolConfig struct {
 	UID                     int                             // the id of the pod user, we give this user ACL access to the UDS socket
 	EthtoolCmds             []string                        // list of ethtool filters to apply to the netdev
 	DPCNIServer             *dpcnisyncerserver.SyncerServer // grpc syncer between DP and CNI
+	BPFDClient              *bpfd.BpfdClient                // bpfd client
 }
 
 /*
@@ -84,9 +89,10 @@ func GetPluginConfig(configFile string) (PluginConfig, error) {
 	}
 
 	pluginConfig = PluginConfig{
-		LogFile:     cfgFile.LogFile,
-		LogLevel:    cfgFile.LogLevel,
-		KindCluster: cfgFile.KindCluster,
+		LogFile:          cfgFile.LogFile,
+		LogLevel:         cfgFile.LogLevel,
+		KindCluster:      cfgFile.KindCluster,
+		BpfdClientEnable: cfgFile.BpfdClientEnable,
 	}
 
 	return pluginConfig, nil
@@ -96,11 +102,13 @@ func GetPluginConfig(configFile string) (PluginConfig, error) {
 GetPoolConfigs returns a slice of PoolConfig objects.
 Each object containing the config and device list for one pool.
 */
-func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler, server *dpcnisyncerserver.SyncerServer) ([]PoolConfig, error) {
+func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler, server *dpcnisyncerserver.SyncerServer, b *bpfd.BpfdClient) ([]PoolConfig, error) {
 	var poolConfigs []PoolConfig
 	network = net
 	node = host
 	dpcniserver = server
+	bpfdClient = b
+	bpfdClientEnable = false
 
 	if dpcniserver == nil {
 		logging.Error("Error dpcniserver not configured")
@@ -112,6 +120,10 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 			logging.Errorf("Error reading config file: %v", err)
 			return poolConfigs, err
 		}
+	}
+
+	if bpfdClient != nil {
+		bpfdClientEnable = true
 	}
 
 	hostname, err := node.Hostname()
@@ -260,12 +272,13 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 				Devices:                 devices,
 				UdsServerDisable:        pool.UdsServerDisable,
 				BpfMapPinningEnable:     pool.BpfMapPinningEnable,
-				BpfdClientEnable:        pool.BpfdClientEnable,
+				BpfdClientEnable:        bpfdClientEnable,
 				UdsTimeout:              pool.UdsTimeout,
 				UdsFuzz:                 pool.UdsFuzz,
 				RequiresUnprivilegedBpf: pool.RequiresUnprivilegedBpf,
 				UID:                     pool.UID,
 				DPCNIServer:             dpcniserver,
+				BPFDClient:              bpfdClient,
 			})
 		}
 	}
