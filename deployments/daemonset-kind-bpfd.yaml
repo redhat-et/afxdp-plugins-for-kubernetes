@@ -137,6 +137,7 @@ rules:
   - bpfd.io
   resources:
   - xdpprograms/status
+  - bpfprograms
   verbs:
   - get
   - list

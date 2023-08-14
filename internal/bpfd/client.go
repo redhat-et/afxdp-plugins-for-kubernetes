@@ -21,11 +21,13 @@ import (
 const (
 	BpfProgCondLoaded       = "Loaded"
 	ProgramReconcileSuccess = "ReconcileSuccess"
+	ProgramReconcileError   = "ReconcileError"
 )
 
 type BpfdClient struct {
 	bpfdClientset     *bpfdclient.Clientset
 	xdpProgramsClient v1alpha1.XdpProgramInterface
+	bpfProgramsClient v1alpha1.BpfProgramInterface
 }
 
 var (
@@ -51,6 +53,7 @@ func NewBpfdClient() *BpfdClient {
 	bc := &BpfdClient{
 		bpfdClientset:     clientset,
 		xdpProgramsClient: bpfdv1alpha.XdpPrograms(),
+		bpfProgramsClient: bpfdv1alpha.BpfPrograms(),
 	}
 
 	logging.Debug("Created a new BpfdClient")
@@ -73,11 +76,28 @@ func (b *BpfdClient) GetXdpProgs() (*bpfdiov1alpha1.XdpProgramList, error) {
 	return xdpProgramList, nil
 }
 
+func (b *BpfdClient) GetBPFProgs() (*bpfdiov1alpha1.BpfProgramList, error) {
+	// Get the xdp program resources
+	bpfProgramList, err := b.bpfProgramsClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to retrieve the xdp program resources: %v", err.Error())
+	}
+
+	if len(bpfProgramList.Items) == 0 {
+		logging.Infof("No BPF programs found\n")
+		return nil, nil
+	}
+
+	return bpfProgramList, nil
+}
+
 func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
 	var (
-		name        = node + "-" + pm + "-" + iface
-		sectionName = "pass"
-		image       = "quay.io/astoycos/xdp_pass:latest"
+		name = node + "-" + pm + "-" + iface
+		//sectionName = "pass"
+		sectionName = "xsk_def_prog"
+		//image       = "quay.io/astoycos/xdp_pass:latest"
+		image = "quay.io/mtahhan/xsk_def_xdp_prog" //TODO make this configurable
 		// sectionName = "xdp"
 		//image       = "quay.io/mtahhan/xsk_def_prog:latest"
 	)
@@ -119,9 +139,36 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
 	logging.Infof("Created XdpProgram resource:\n%v\n", result)
 
 	time.Sleep(time.Second)
-	_, err = b.checkProgStatus(name)
+	err = b.checkProgStatus(name)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create XdpProgram resource: %v", err)
+	}
+
+	bpfProgramList, err := b.GetBPFProgs()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get bpf prog resources: %v", err)
+	}
+
+	// Try to get the map(s) info for the bpf program
+	if bpfProgramList != nil {
+		bpfProgName := node + "-" + pm + "-" + iface + "-" + node
+		for _, bpfProgram := range bpfProgramList.Items {
+			logging.Infof("bpfProgram.ObjectMeta.Name: %s", bpfProgram.ObjectMeta.Name)
+			if bpfProgram.ObjectMeta.Name == bpfProgName {
+				logging.Infof("Found the BPF prog %s \n", bpfProgram.ObjectMeta.Name)
+				for _, maps := range bpfProgram.Spec.Programs {
+					logging.Infof("MAPS: %v", maps)
+					if len(maps) == 0 {
+						logging.Infof("NO MAPS") //TODO log/return an error.
+					} else {
+						for _, mapName := range maps {
+							logging.Infof("map: %v", mapName)
+						}
+					}
+				}
+
+			}
+		}
 	}
 
 	return nil
@@ -162,7 +209,7 @@ func (b *BpfdClient) DeleteXdpProg(iface string) error {
 	return nil
 }
 
-func (b *BpfdClient) checkProgStatus(name string) (string, error) {
+func (b *BpfdClient) checkProgStatus(name string) error {
 
 	selector := metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -178,24 +225,24 @@ func (b *BpfdClient) checkProgStatus(name string) (string, error) {
 			Watch:         true,
 		})
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to watch XdpProgram resource: %v", err)
+		return errors.Wrapf(err, "Failed to watch XdpProgram resource: %v", err)
 	}
 
 	defer xdpWatcher.Stop()
 
-	// Try to check status for 10 seconds
-	for i := 0; i < 10; i++ {
+	// Try to check status for 5 seconds
+	for i := 0; i < 5; i++ {
 		event, ok := <-xdpWatcher.ResultChan()
 		if !ok {
 			// channel closed
 			logging.Errorf("Channel closed")
-			return "", errors.New("Channel Closed")
+			return errors.New("Channel Closed")
 		}
 
 		prog, ok := event.Object.(*bpfdiov1alpha1.XdpProgram)
 		if !ok {
 			logging.Errorf("couldn't get xdp prog object")
-			return "", errors.New("Failed to get xdp prog object")
+			return errors.New("Failed to get xdp prog object")
 		}
 
 		logging.Infof("\n%v", prog.Status)
@@ -205,11 +252,13 @@ func (b *BpfdClient) checkProgStatus(name string) (string, error) {
 		condition := prog.Status.Conditions[recentIdx]
 
 		switch condition.Type {
+		case ProgramReconcileError:
+			logging.Errorf("Failed to load xdp program")
+			return errors.New("Failed to load xdp program")
 		case BpfProgCondLoaded:
 		case ProgramReconcileSuccess:
-			// return success
-			logging.Infof("Bpf program Loaded %v", condition.Type)
-			return "success", nil
+			logging.Infof("Bpf program Loaded %v", ProgramReconcileSuccess)
+			return nil
 		default:
 			logging.Infof("Bpf program status %v", condition.Type)
 		}
@@ -217,5 +266,5 @@ func (b *BpfdClient) checkProgStatus(name string) (string, error) {
 		time.Sleep(1 * time.Second)
 	}
 
-	return "", errors.New("Failed to load xdp program")
+	return errors.New("Failed to load xdp program")
 }

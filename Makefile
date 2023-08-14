@@ -279,7 +279,7 @@ kind-undeploy-bpfd: ## Undeploy the Kind Deamonset
 
 # make KIND_CLUSTER_NAME=bpfd-deployment kind-deploy-bpfd
 .PHONY: kind-deploy-bpfd
-kind-deploy-bpfd: kind-undeploy-bpfd kind-load-images ## Deploy the Deamonset and CNI in Kind
+kind-deploy-bpfd: kind-undeploy-bpfd kind-load-images ## Deploy the Deamonset and CNI in the Kind
 	@echo "****** Deploy Daemonset  ******"
 	@echo
 	kubectl create -f ./deployments/daemonset-kind-bpfd.yaml
