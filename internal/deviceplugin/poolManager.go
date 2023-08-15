@@ -289,11 +289,18 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 
 			if pm.BpfdClientEnable {
 
-				err := pm.BpfdClient.SubmitXdpProg(device.Name(), pm.Node, pm.DevicePrefix)
+				err, xskmap := pm.BpfdClient.SubmitXdpProg(device.Name(), pm.Node, pm.DevicePrefix)
 				if err != nil {
 					logging.Errorf("Error SubmitXdpProg to bpfd %v", err)
 					return &response, err
 				}
+
+				logging.Debugf("mapping %s to %s", xskmap, constants.Bpf.BpfMapPodPath)
+				cresp.Mounts = append(cresp.Mounts, &pluginapi.Mount{
+					HostPath:      xskmap,
+					ContainerPath: constants.Bpf.BpfMapPodPath,
+					ReadOnly:      false,
+				})
 
 			}
 		}

@@ -91,21 +91,21 @@ func (b *BpfdClient) GetBPFProgs() (*bpfdiov1alpha1.BpfProgramList, error) {
 	return bpfProgramList, nil
 }
 
-func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
+func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) (error, string) {
 	var (
-		name = node + "-" + pm + "-" + iface
-		//sectionName = "pass"
-		sectionName = "xsk_def_prog"
-		//image       = "quay.io/astoycos/xdp_pass:latest"
-		image = "quay.io/mtahhan/xsk_def_xdp_prog" //TODO make this configurable
-		// sectionName = "xdp"
-		//image       = "quay.io/mtahhan/xsk_def_prog:latest"
+		name        = node + "-" + pm + "-" + iface
+		sectionName = "stats"
+		image       = "quay.io/bpfd-bytecode/go-xdp-counter"
+		// sectionName = "xsk_def_prog"                     //TODO make this configurable
+		// image       = "quay.io/mtahhan/xsk_def_xdp_prog" //TODO make this configurable
+
 	)
-	// Create an example XdpProgram resource
+
+	// Create an XdpProgram resource
 	xdpProgram := &bpfdiov1alpha1.XdpProgram{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			//	Namespace: "bpfd",
+			//	Namespace: "bpfd", //TODO decide on namespace
 			Labels: map[string]string{"afxdp.io/xdpprog": name},
 		},
 		Spec: bpfdiov1alpha1.XdpProgramSpec{
@@ -131,38 +131,37 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
 	}
 
 	// Submit the XdpProgram resource to the API
-	result, err := b.xdpProgramsClient.Create(context.TODO(), xdpProgram, metav1.CreateOptions{})
+	_, err := b.xdpProgramsClient.Create(context.TODO(), xdpProgram, metav1.CreateOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "Failed to create XdpProgram resource: %v", err)
+		return errors.Wrapf(err, "Failed to create XdpProgram resource: %v", err), ""
 	}
-
-	logging.Infof("Created XdpProgram resource:\n%v\n", result)
 
 	time.Sleep(time.Second)
 	err = b.checkProgStatus(name)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to create XdpProgram resource: %v", err)
+		return errors.Wrapf(err, "Failed to create XdpProgram resource: %v", err), ""
 	}
 
 	bpfProgramList, err := b.GetBPFProgs()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get bpf prog resources: %v", err)
+		return errors.Wrapf(err, "Failed to get bpf prog resources: %v", err), ""
 	}
 
-	// Try to get the map(s) info for the bpf program
+	var xskmap string
+
+	// Try to get the xspmap path from the bpf program resource
 	if bpfProgramList != nil {
 		bpfProgName := node + "-" + pm + "-" + iface + "-" + node
 		for _, bpfProgram := range bpfProgramList.Items {
-			logging.Infof("bpfProgram.ObjectMeta.Name: %s", bpfProgram.ObjectMeta.Name)
 			if bpfProgram.ObjectMeta.Name == bpfProgName {
-				logging.Infof("Found the BPF prog %s \n", bpfProgram.ObjectMeta.Name)
 				for _, maps := range bpfProgram.Spec.Programs {
-					logging.Infof("MAPS: %v", maps)
 					if len(maps) == 0 {
-						logging.Infof("NO MAPS") //TODO log/return an error.
+						logging.Errorf("NO MAPS FOUND for %s", bpfProgName)
+						return errors.New("Failed to find a map for the loaded bpf program"), ""
 					} else {
 						for _, mapName := range maps {
 							logging.Infof("map: %v", mapName)
+							xskmap = mapName
 						}
 					}
 				}
@@ -171,7 +170,7 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) error {
 		}
 	}
 
-	return nil
+	return nil, xskmap
 }
 
 // Delete XdpProgram
