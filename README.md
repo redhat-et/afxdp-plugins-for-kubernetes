@@ -548,6 +548,14 @@ From the [examples/network-attachment-definition.yaml](./examples/network-attach
 
 TODO
 
+#### AF_XDP Bytecode image
+
+It's essential to build a container that holds the AF_XDP bpf program bytecode from [xdp-tools]()
+
+```bash
+docker build  --build-arg PROGRAM_NAME=xsk_def_xdp_prog  --build-arg PROGRAM_TYPE=xdp  --build-arg BYTECODE_FILENAME=xsk_def_xdp_prog.o --build-arg SECTION_NAME=xsk_def_prog  --build-arg KERNEL_COMPILE_VER=$(uname -r)  -f packaging/container-deployment/Containerfile.bytecode  /$PATH_TO_XDP_TOOLS/xdp-tools/lib/libxdp -t quay.io/$USER/xsk_def_xdp_prog:latest
+```
+
 ## CLOC
 
 Output from CLOC (count lines of code) - github.com/AlDanial/cloc
