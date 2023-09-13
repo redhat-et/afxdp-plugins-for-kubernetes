@@ -1,0 +1,179 @@
+@startuml
+
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+skinparam legendBackgroundColor WhiteSmoke
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+
+ legend top right
+|= |= Legend |
+|<back:LightBlue>   </back>| Participants from this project - Device Plugin and CNI |
+|<back:Dodgerblue>   </back>| Threads within Device Plugin |
+|<back:Business>   </back>| Participants external to this project |
+|<back:Magenta>   </back>| New Sequence |
+|<back:Yellow>   </back>| Notes |
+endlegend
+
+
+
+actor "User"
+participant "Linux"
+participant "Kubelet"
+box "Device Plugin" #LightBlue
+	participant "DP Main Thread" #dodgerblue
+	participant "DP CNI Syncer Server" #dodgerblue
+end box
+participant "bpfd"
+participant "CNI" #LightBlue
+participant "Pod/AF_XDP App"
+
+
+== Initialization ==
+autonumber
+
+"User" -> "Kubelet": network attachment definition (CNI config)
+"User" -> "DP Main Thread": deploy
+activate "DP Main Thread"
+
+"DP Main Thread" -> "DP Main Thread": config.json
+"DP Main Thread" -> "Linux": create log file
+"DP Main Thread" -> "Linux" : Check host for requirements
+"DP Main Thread" -> "Linux": net.Interfaces()
+
+activate "DP Main Thread" #DarkGray
+note right #DarkGray: <color #White>discover resources</color>
+
+"Linux" --> "DP Main Thread": interface list
+
+"DP Main Thread" -> "Linux" : os.Readlink /sys/class/net/<interface>/device/driver
+"Linux" --> "DP Main Thread" : driver name
+
+activate "DP Main Thread" #SlateGray
+note right #SlateGray: <color #White>loop interfaces, build device list</color>
+
+deactivate "DP Main Thread"
+
+autonumber stop
+"DP Main Thread" [hidden]-> "DP Main Thread"
+autonumber resume
+
+deactivate "DP Main Thread"
+"DP Main Thread" -[#Magenta]> "DP CNI Syncer Server": <color:Magenta> Start DPSyncer Server (grpc)</color>
+activate "DP CNI Syncer Server"
+"DP Main Thread" -[#Magenta]> "DP Main Thread": <color:Magenta> NewBpfdClient </color>
+"DP Main Thread" -> "DP Main Thread": start GRPC
+"DP Main Thread" -> "Kubelet": GRPC: register
+"DP Main Thread" -> "Kubelet": GRPC: device list
+deactivate "DP Main Thread"
+deactivate "DP CNI Syncer Server"
+
+== Pod Creation ==
+autonumber
+
+"User" -> "Kubelet": create pod
+"Kubelet" -> "DP Main Thread": GRPC: Allocate(subfunction)
+activate "DP Main Thread"
+
+"DP Main Thread" -> "Linux" : devlink port add pci/0000:3b:00.0 flavour pcisf pfnum 0 sfnum 123
+"Linux" --> "DP Main Thread" : pci/port/index (e.g. pci/0000:3b:00.0/12)
+
+"DP Main Thread" -> "Linux" : devlink port function set pci/0000:3b:00.0/12 state active
+"Linux" --> "DP Main Thread" : return 0
+
+"DP Main Thread" -> "Linux": net.if_nametoindex(subfunction)
+"Linux" --> "DP Main Thread": if_index
+"DP Main Thread" -[#Magenta]> "DP Main Thread": <color:Magenta> BpfdClient.SubmitXdpProg(ifname, node, devicePrefix, bpfProg, bpfSec) </color>
+activate "DP Main Thread"
+"DP Main Thread" -[#Magenta]> "bpfd": <color:Magenta> xdpProgramsClient.Create(context.TODO(), xdpProgram, metav1.CreateOptions{}) </color>
+"DP Main Thread" -[#Magenta]> "DP Main Thread": <color:Magenta> wait/check for created xdp prog + get bpf map pin path </color>
+"DP Main Thread" --> "Kubelet": GRPC: AllocateResponse(xskmap mount path, pod env vars)
+deactivate "DP Main Thread"
+
+autonumber stop
+"Kubelet" -[#Red]>> "Pod/AF_XDP App" : <color:Red>Kubelet starts creating the pod around now
+autonumber resume
+
+"Kubelet" -> "CNI" : cmdAdd(subfunction, namespace, config)
+activate "CNI"
+"CNI" -> "CNI" : cni.IPAM
+
+"CNI" -> "Pod/AF_XDP App" : place subfunction in pod netns
+"CNI" -> "Kubelet" : return 0
+
+deactivate "CNI"
+
+autonumber stop
+
+== Pod Running ==
+
+
+note left of "DP Main Thread" #Magenta
+   Nothing for the DP to do here.
+   "Pod/AF_XDP App": needs to call bpf_obj_get(xsk_map_path) to get the bpf map fd.
+end note
+
+== Pod Deletion ==
+autonumber
+
+
+"User" -> "Kubelet": delete pod
+"Kubelet" -> "Pod/AF_XDP App" : stop pod
+deactivate "Pod/AF_XDP App"
+"Kubelet" -> "CNI" : cmdDel(subfunction, config)
+activate "CNI"
+"CNI" -> "Pod/AF_XDP App" : subfunction from pod to host netns
+"Pod/AF_XDP App" --> "CNI" : subfunction
+"CNI" -> "Linux" : clear ethtool filters
+"CNI" -> "CNI" : clear IPAM
+"CNI" -> "Linux": net.if_nametoindex(subfunction)
+"Linux" --> "CNI": if_index
+"CNI" -[#Magenta]> "DP CNI Syncer Server": <color:Magenta> grpc.DialContext ...</color>
+activate "DP CNI Syncer Server"
+"CNI" -[#Magenta]> "DP CNI Syncer Server": <color:Magenta> DelNetDev(ifname)</color>
+"DP CNI Syncer Server" -[#Magenta]> "DP CNI Syncer Server": <color:Magenta> Lookup PoolBpfMapManager </color>
+"DP CNI Syncer Server" -[#Magenta]> "DP Main Thread": <color:Magenta> DeleteXdpProg </color>
+"DP Main Thread" -[#Magenta]> "bpfd": <color:Magenta> xdpProgramsClient.Delete(context.TODO(), name, metav1.DeleteOptions{}) </color>
+"DP CNI Syncer Server" --[#Magenta]> "CNI": <color:Magenta> Success </color>
+deactivate "DP CNI Syncer Server"
+"Linux" --> "CNI": return 0
+
+"CNI" -> "Linux" : devlink port list | grep subfunction
+"Linux" --> "CNI" : pci/port/index (e.g. pci/0000:3b:00.0/12)
+
+"CNI" -> "Linux" : devlink port function set pci/0000:3b:00.0/12 state inactive
+"Linux" --> "CNI" : return 0
+
+"CNI" -> "Linux" : devlink port del pci/0000:3b:00.0/12
+"Linux" --> "CNI" : return 0
+
+"CNI" --> "Kubelet": return 0
+deactivate "CNI"
+
+"Kubelet" -> "Pod/AF_XDP App" : delete pod
+deactivate "Pod/AF_XDP App"
+
+
+@enduml

@@ -573,13 +573,21 @@ For example for the default AF_XDP eBPF program from xdp-tools [xsk_def_xdp_prog
 docker build  --build-arg PROGRAM_NAME=xsk_def_xdp_prog  --build-arg PROGRAM_TYPE=xdp  --build-arg BYTECODE_FILENAME=xsk_def_xdp_prog.o --build-arg SECTION_NAME=xsk_def_prog  --build-arg KERNEL_COMPILE_VER=$(uname -r)  -f packaging/container-deployment/Containerfile.bytecode  /$PATH_TO_XDP_TOOLS/xdp-tools/lib/libxdp -t quay.io/$USER/xsk_def_xdp_prog:latest
 ```
 
-TODO ADD CONFIGURATION PARAM FOR AF_XDP...
+Two pool configuration parameters have been added to allow the specification of the default OCI bytecode image and section to use,
+an example is shown below:
+
+```yaml
+    "bpfByteCodeImage": "quay.io/bpfd-bytecode/go-xdp-counter",
+    "bpfByteCodeSection": "stats",
+```
+
+In the future, we would like to make the eBPF program/bytecode selection configurable via pod annotation.
 
 #### DPCNIServer
 
-The bpfd integration introduced the need to introduce a syncronization call from the CNI to the DP in order to delete the XDP
-program resource for an interface being returned to the host on pod deletion. Originally the BPF program unload functionality
-was part of the CNI itself.
+The bpfd integration and map pinning support in the DP introduced the need for a syncronization call from the CNI to the DP in order
+to delete/unload the XDP program and any resources for an interface being returned to the host on pod deletion. Originally the BPF
+program unload functionality was part of the CNI itself.
 
 ## CLOC
 
