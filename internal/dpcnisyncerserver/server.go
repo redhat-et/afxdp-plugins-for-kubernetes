@@ -95,7 +95,7 @@ func (s *SyncerServer) DelNetDev(ctx context.Context, in *pb.DeleteNetDevReq) (*
 		return &pb.DeleteNetDevResp{Ret: 0}, nil
 	}
 
-	return &pb.DeleteNetDevResp{Ret: -1}, errors.New("BPF Map pinning is not enabled")
+	return &pb.DeleteNetDevResp{Ret: -1}, errors.New("BPF Map pinning/bpfd client is not enabled")
 }
 
 func (s *SyncerServer) StopGRPCSyncer() {

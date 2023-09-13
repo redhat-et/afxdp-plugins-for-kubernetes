@@ -68,6 +68,8 @@ type PoolManager struct {
 	SyncerActive        bool
 	Pbm                 bpf.PoolBpfMapManager
 	BpfdClient          *bpfd.BpfdClient
+	BpfProg             string
+	BpfSec              string
 }
 
 func NewPoolManager(config PoolConfig) PoolManager {
@@ -88,6 +90,8 @@ func NewPoolManager(config PoolConfig) PoolManager {
 		EthtoolFilters:      config.EthtoolCmds,
 		DpCniSyncerServer:   config.DPCNIServer,
 		BpfdClient:          config.BPFDClient,
+		BpfProg:             config.BPFByteCodeImage,
+		BpfSec:              config.BPFByteCodeSection,
 		Node:                os.Getenv("HOSTNAME"),
 	}
 }
@@ -289,7 +293,7 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 
 			if pm.BpfdClientEnable {
 
-				err, xskmap := pm.BpfdClient.SubmitXdpProg(device.Name(), pm.Node, pm.DevicePrefix)
+				err, xskmap := pm.BpfdClient.SubmitXdpProg(device.Name(), pm.Node, pm.DevicePrefix, pm.BpfProg, pm.BpfSec)
 				if err != nil {
 					logging.Errorf("Error SubmitXdpProg to bpfd %v", err)
 					return &response, err

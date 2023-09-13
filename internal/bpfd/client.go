@@ -91,11 +91,11 @@ func (b *BpfdClient) GetBPFProgs() (*bpfdiov1alpha1.BpfProgramList, error) {
 	return bpfProgramList, nil
 }
 
-func (b *BpfdClient) SubmitXdpProg(iface, node, pm string) (error, string) {
+func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (error, string) {
 	var (
 		name        = node + "-" + pm + "-" + iface
 		sectionName = "stats"
-		image       = "quay.io/bpfd-bytecode/go-xdp-counter"
+		//image       = "quay.io/bpfd-bytecode/go-xdp-counter"
 		// sectionName = "xsk_def_prog"                     //TODO make this configurable
 		// image       = "quay.io/mtahhan/xsk_def_xdp_prog" //TODO make this configurable
 

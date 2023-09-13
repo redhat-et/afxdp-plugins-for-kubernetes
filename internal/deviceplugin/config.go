@@ -72,6 +72,8 @@ type PoolConfig struct {
 	EthtoolCmds             []string                        // list of ethtool filters to apply to the netdev
 	DPCNIServer             *dpcnisyncerserver.SyncerServer // grpc syncer between DP and CNI
 	BPFDClient              *bpfd.BpfdClient                // bpfd client
+	BPFByteCodeImage        string                          // OCI compiant eBPF Bytecode image.
+	BPFByteCodeSection      string                          // eBPF Bytecode section.
 }
 
 /*

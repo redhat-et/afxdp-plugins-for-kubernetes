@@ -6,6 +6,7 @@ require (
 	github.com/bpfd-dev/bpfd v0.2.1
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.1.1
+	github.com/distribution/reference v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/gofuzz v1.2.0
