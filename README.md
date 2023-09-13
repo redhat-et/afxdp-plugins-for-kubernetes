@@ -546,15 +546,40 @@ From the [examples/network-attachment-definition.yaml](./examples/network-attach
 
 ### bpfd Client
 
-TODO
+bpfd is a system daemon aimed at simplifying the deployment and management of eBPF programs. Integrating the AF_XDP
+device plugin with bpfd means delegating the responsibility of loading and unloading the eBPF programs for AF_XDP applications
+to the bpfd daemonset running on each node. This means that instead of AF_XDP DP loading/unloading a BPF program, it will create/delete
+an [XdpProgram CRD](https://pkg.go.dev/github.com/bpfd-dev/bpfd@v0.2.1/bpfd-operator/apis/v1alpha1#XdpProgram) via the
+[bpfd-operator APIs](https://pkg.go.dev/github.com/bpfd-dev/bpfd@v0.2.1/bpfd-operator/apis/v1alpha1).
+
+More info about bpfd can be found [here](https://bpfd.dev/#challenges-for-ebpf-in-kubernetes).
 
 #### AF_XDP Bytecode image
 
-It's essential to build a container that holds the AF_XDP bpf program bytecode from [xdp-tools]()
+bpfd works with eBPF Bytecode packaged in an OCI compliant image. More info on this can be found
+[here](https://bpfd.dev/developer-guide/shipping-bytecode/). As such it's essential to build a container
+that holds the AF_XDP bpf program bytecode. An example of such a program exists in
+`internal/bpf/xdp-afxdp-redirect``. To build such a program clone bpfd:
+
+```bash
+https://github.com/bpfd-dev/bpfd.git
+```
+
+And build docker image that specifies the `PROGRAM_TYPE`, `BYTECODE_FILENAME`, `SECTION_NAME` and `KERNEL_COMPILE_VER`.
+
+For example for the default AF_XDP eBPF program from xdp-tools [xsk_def_xdp_prog.c](https://github.com/xdp-project/xdp-tools/blob/master/lib/libxdp/xsk_def_xdp_prog.c)
 
 ```bash
 docker build  --build-arg PROGRAM_NAME=xsk_def_xdp_prog  --build-arg PROGRAM_TYPE=xdp  --build-arg BYTECODE_FILENAME=xsk_def_xdp_prog.o --build-arg SECTION_NAME=xsk_def_prog  --build-arg KERNEL_COMPILE_VER=$(uname -r)  -f packaging/container-deployment/Containerfile.bytecode  /$PATH_TO_XDP_TOOLS/xdp-tools/lib/libxdp -t quay.io/$USER/xsk_def_xdp_prog:latest
 ```
+
+TODO ADD CONFIGURATION PARAM FOR AF_XDP...
+
+#### DPCNIServer
+
+The bpfd integration introduced the need to introduce a syncronization call from the CNI to the DP in order to delete the XDP
+program resource for an interface being returned to the host on pod deletion. Originally the BPF program unload functionality
+was part of the CNI itself.
 
 ## CLOC
 
