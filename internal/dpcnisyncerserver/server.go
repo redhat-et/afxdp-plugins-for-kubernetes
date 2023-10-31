@@ -98,10 +98,11 @@ func (s *SyncerServer) DelNetDev(ctx context.Context, in *pb.DeleteNetDevReq) (*
 	if s.BpfdClientEnable && !s.BpfMapPinEnable {
 		err := s.BpfdClient.DeleteXdpProg(netDevName)
 		if err != nil {
-			logging.Errorf("Could NOT delete BPF Prog for %s", netDevName)
-			return &pb.DeleteNetDevResp{Ret: -1}, errors.Wrapf(err, "Could NOT delete BPF Prog for %s: %v", netDevName, err.Error())
+			logging.Errorf("BpfdClient could NOT delete BPF Prog for %s", netDevName)
+			return &pb.DeleteNetDevResp{Ret: -1}, errors.Wrapf(err, "BpfdClient could NOT delete BPF Prog for %s: %v", netDevName, err.Error())
 		}
 
+		logging.Infof("Network interface %s deleted", netDevName)
 		return &pb.DeleteNetDevResp{Ret: 0}, nil
 	}
 

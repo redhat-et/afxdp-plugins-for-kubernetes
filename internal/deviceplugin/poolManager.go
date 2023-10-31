@@ -292,7 +292,6 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 			}
 
 			if pm.BpfdClientEnable {
-				logging.Infof("BpfProg %s BpfSec %s", pm.BpfProg, pm.BpfSec)
 				err, xskmap := pm.BpfdClient.SubmitXdpProg(device.Name(), pm.Node, pm.DevicePrefix, pm.BpfProg, pm.BpfSec)
 				if err != nil {
 					logging.Errorf("Error SubmitXdpProg to bpfd %v", err)
