@@ -15,8 +15,8 @@ data:
             "name":"myPool",
             "mode":"primary",
             "UdsServerDisable": true,
-            "bpfByteCodeImage": "quay.io/bpfd-bytecode/go-xdp-counter",
-            "bpfByteCodeSection": "stats",
+            "BpfByteCodeImage": "quay.io/bpfd-bytecode/go-xdp-counter:latest",
+            "BpfByteCodeFunction": "xdp_stats",
             "drivers":[
               {
                 "name":"veth"
@@ -124,7 +124,7 @@ metadata:
   name: bpfd-xdpprogram-viewer-role
 rules:
 - apiGroups:
-  - bpfd.io
+  - bpfd.dev
   resources:
   - xdpprograms
   verbs:
@@ -136,7 +136,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - bpfd.io
+  - bpfd.dev
   resources:
   - xdpprograms/status
   - bpfprograms

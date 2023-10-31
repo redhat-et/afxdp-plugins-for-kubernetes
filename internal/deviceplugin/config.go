@@ -73,7 +73,7 @@ type PoolConfig struct {
 	DPCNIServer             *dpcnisyncerserver.SyncerServer // grpc syncer between DP and CNI
 	BPFDClient              *bpfd.BpfdClient                // bpfd client
 	BPFByteCodeImage        string                          // OCI compiant eBPF Bytecode image.
-	BPFByteCodeSection      string                          // eBPF Bytecode section.
+	BPFByteCodeFunction     string                          // eBPF Bytecode section.
 }
 
 /*
@@ -177,8 +177,8 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 			vethNums := re.FindAllString(device, -1)
 			for _, n := range vethNums {
 				i, _ := strconv.Atoi(n)
-				if (i % 2) == 1 {
-					logging.Debugf("%s is an odd veth, removing from list of host devices", device)
+				if (i%2) == 1 || (i > 12) {
+					logging.Debugf("%s is an odd veth (host-side peer) or not a kind veth, removing from list of host devices", device)
 					delete(hostDevices, device)
 					continue
 				}
@@ -279,6 +279,8 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 				UdsFuzz:                 pool.UdsFuzz,
 				RequiresUnprivilegedBpf: pool.RequiresUnprivilegedBpf,
 				UID:                     pool.UID,
+				BPFByteCodeImage:        pool.BPFByteCodeImage,
+				BPFByteCodeFunction:     pool.BPFByteCodeFunction,
 				DPCNIServer:             dpcniserver,
 				BPFDClient:              bpfdClient,
 			})

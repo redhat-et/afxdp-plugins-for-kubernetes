@@ -578,7 +578,7 @@ an example is shown below:
 
 ```yaml
     "bpfByteCodeImage": "quay.io/bpfd-bytecode/go-xdp-counter",
-    "bpfByteCodeSection": "stats",
+    "bpfByteCodeFunction": "xdp_stats",
 ```
 
 In the future, we would like to make the eBPF program/bytecode selection configurable via pod annotation.

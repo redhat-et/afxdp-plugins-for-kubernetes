@@ -93,13 +93,16 @@ func (b *BpfdClient) GetBPFProgs() (*bpfdiov1alpha1.BpfProgramList, error) {
 
 func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (error, string) {
 	var (
-		name        = node + "-" + pm + "-" + iface
-		sectionName = "stats"
-		//image       = "quay.io/bpfd-bytecode/go-xdp-counter"
-		// sectionName = "xsk_def_prog"                     //TODO make this configurable
-		// image       = "quay.io/mtahhan/xsk_def_xdp_prog" //TODO make this configurable
-
+		name       = node + "-" + pm + "-" + iface
+		interfaces []string
 	)
+	interfaces = append(interfaces, iface)
+
+	if len(image) == 0 || len(sec) == 0 {
+		return errors.New("BPF image or function is empty"), ""
+	}
+
+	logging.Infof("IMAGE %s FUNCTION %s", image, sec)
 
 	// Create an XdpProgram resource
 	xdpProgram := &bpfdiov1alpha1.XdpProgram{
@@ -110,7 +113,7 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (error, s
 		},
 		Spec: bpfdiov1alpha1.XdpProgramSpec{
 			BpfProgramCommon: bpfdiov1alpha1.BpfProgramCommon{
-				SectionName: sectionName,
+				BpfFunctionName: sec,
 				NodeSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"kubernetes.io/hostname": node,
@@ -124,11 +127,13 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (error, s
 				},
 			},
 			InterfaceSelector: bpfdiov1alpha1.InterfaceSelector{
-				Interface: &iface,
+				Interfaces: &interfaces,
 			},
 			Priority: 0,
 		},
 	}
+
+	logging.Infof("Submitting this xdp program %v \n", xdpProgram)
 
 	// Submit the XdpProgram resource to the API
 	_, err := b.xdpProgramsClient.Create(context.TODO(), xdpProgram, metav1.CreateOptions{})
@@ -154,16 +159,13 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (error, s
 		bpfProgName := node + "-" + pm + "-" + iface + "-" + node
 		for _, bpfProgram := range bpfProgramList.Items {
 			if bpfProgram.ObjectMeta.Name == bpfProgName {
-				for _, maps := range bpfProgram.Spec.Programs {
-					if len(maps) == 0 {
-						logging.Errorf("NO MAPS FOUND for %s", bpfProgName)
-						return errors.New("Failed to find a map for the loaded bpf program"), ""
-					} else {
-						for _, mapName := range maps {
-							logging.Infof("map: %v", mapName)
-							xskmap = mapName
-						}
-					}
+				if len(bpfProgram.Spec.Maps) == 0 {
+					logging.Errorf("NO MAPS FOUND for %s", bpfProgName)
+					return errors.New("Failed to find a map for the loaded bpf program"), ""
+				}
+				for m, path := range bpfProgram.Spec.Maps {
+					logging.Infof("map: %v", m)
+					xskmap = path
 				}
 
 			}
@@ -229,8 +231,10 @@ func (b *BpfdClient) checkProgStatus(name string) error {
 
 	defer xdpWatcher.Stop()
 
-	// Try to check status for 5 seconds
-	for i := 0; i < 5; i++ {
+	// Try to check status for 10 seconds
+	for i := 0; i < 10; i++ {
+		logging.Info("CHECKING STATUS OF XDP PROG")
+
 		event, ok := <-xdpWatcher.ResultChan()
 		if !ok {
 			// channel closed
@@ -252,8 +256,10 @@ func (b *BpfdClient) checkProgStatus(name string) error {
 
 		switch condition.Type {
 		case ProgramReconcileError:
-			logging.Errorf("Failed to load xdp program")
-			return errors.New("Failed to load xdp program")
+			if i == 9 {
+				logging.Errorf("Failed to load xdp program")
+				return errors.New("Failed to load xdp program")
+			}
 		case BpfProgCondLoaded:
 		case ProgramReconcileSuccess:
 			logging.Infof("Bpf program Loaded %v", ProgramReconcileSuccess)
@@ -261,7 +267,6 @@ func (b *BpfdClient) checkProgStatus(name string) error {
 		default:
 			logging.Infof("Bpf program status %v", condition.Type)
 		}
-
 		time.Sleep(1 * time.Second)
 	}
 

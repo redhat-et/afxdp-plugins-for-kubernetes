@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/distribution/reference"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
@@ -99,8 +98,8 @@ type configFile_Pool struct {
 	UdsFuzz                 bool                 `json:"UdsFuzz"`
 	RequiresUnprivilegedBpf bool                 `json:"RequiresUnprivilegedBpf"`
 	UID                     int                  `json:"uid"`
-	BPFByteCodeImage        string               `json:"bpfByteCodeImage"`
-	BPFByteCodeSection      string               `json:"bpfByteCodeSection"`
+	BPFByteCodeImage        string               `json:"BpfByteCodeImage"`
+	BPFByteCodeFunction     string               `json:"BpfByteCodeFunction"`
 }
 
 type configFile struct {
@@ -236,16 +235,16 @@ func (c configFile_Pool) Validate() error {
 			validation.When(!(c.UID == 0), validation.Max(constants.UID.Maximum)),
 			validation.When(!(c.UID == 0), validation.Min(constants.UID.Minimum)),
 		),
-		validation.Field( //MT_TODO VALIDATE IMAGE STRING
-			&c.BPFByteCodeImage,
-			validation.Required.When(len(c.BPFByteCodeImage) > 0).Error(poolBPFImgNotEmpty),
-			validation.Match(reference.ReferenceRegexp).Error(poolBPFImgCharacters),
-		),
-		validation.Field( //MT_TODO VALIDATE IMAGE STRING
-			&c.BPFByteCodeSection,
-			validation.Required.When(len(c.BPFByteCodeSection) > 0).Error(poolBPFSecNotEmpty),
-			is.ASCII.Error(poolBPFSecCharacters),
-		),
+		// validation.Field( //MT_TODO VALIDATE IMAGE STRING
+		// 	&c.BPFByteCodeImage,
+		// 	validation.Required.When(len(c.BPFByteCodeImage) == 0).Error(poolBPFImgNotEmpty),
+		// 	validation.Match(reference.ReferenceRegexp).Error(poolBPFImgCharacters),
+		// ),
+		// validation.Field( //MT_TODO VALIDATE IMAGE STRING
+		// 	&c.BPFByteCodeFunction,
+		// 	validation.Required.When(len(c.BPFByteCodeFunction) == 0).Error(poolBPFSecNotEmpty),
+		// 	is.ASCII.Error(poolBPFSecCharacters),
+		// ),
 	)
 }
 

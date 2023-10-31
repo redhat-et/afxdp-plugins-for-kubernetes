@@ -65,8 +65,8 @@ func (s *SyncerServer) RegisterMapManager(b bpf.PoolBpfMapManager) {
 
 func (s *SyncerServer) DelNetDev(ctx context.Context, in *pb.DeleteNetDevReq) (*pb.DeleteNetDevResp, error) {
 
+	netDevName := in.GetName()
 	if !s.BpfdClientEnable && s.BpfMapPinEnable {
-		netDevName := in.GetName()
 		logging.Infof("Looking up Map Manager for %s", netDevName)
 		found := false
 		var pm bpf.PoolBpfMapManager
@@ -92,6 +92,16 @@ func (s *SyncerServer) DelNetDev(ctx context.Context, in *pb.DeleteNetDevReq) (*
 		}
 
 		logging.Infof("Network interface %s deleted", netDevName)
+		return &pb.DeleteNetDevResp{Ret: 0}, nil
+	}
+
+	if s.BpfdClientEnable && !s.BpfMapPinEnable {
+		err := s.BpfdClient.DeleteXdpProg(netDevName)
+		if err != nil {
+			logging.Errorf("Could NOT delete BPF Prog for %s", netDevName)
+			return &pb.DeleteNetDevResp{Ret: -1}, errors.Wrapf(err, "Could NOT delete BPF Prog for %s: %v", netDevName, err.Error())
+		}
+
 		return &pb.DeleteNetDevResp{Ret: 0}, nil
 	}
 

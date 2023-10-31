@@ -3,7 +3,7 @@ module github.com/intel/afxdp-plugins-for-kubernetes
 go 1.13
 
 require (
-	github.com/bpfd-dev/bpfd v0.2.1
+	github.com/bpfd-dev/bpfd v0.3.0
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.1.1
 	github.com/distribution/reference v0.5.0
