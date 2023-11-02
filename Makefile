@@ -233,6 +233,10 @@ kind-label-nodes: ## Label the kind worker nodes with cndp="true"
 	kubectl label node ${KIND_CLUSTER_NAME}-worker cndp="true"
 	kubectl label node ${KIND_CLUSTER_NAME}-worker2 cndp="true"
 
+.PHONY: kind-label-bpfd-cp
+kind-label-bpfd-cp: ## Label the kind worker nodes with cndp="true"
+	kubectl label node ${KIND_CLUSTER_NAME}-control-plane cndp="true"
+
 .PHONY: kind-load-images
 kind-load-images:  ## Load the image on the kind cluster
 	@echo "****** Loading AF_XDP DEVICE PLUGIN image  ******"

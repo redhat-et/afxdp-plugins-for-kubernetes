@@ -15,8 +15,8 @@ data:
             "name":"myPool",
             "mode":"primary",
             "UdsServerDisable": true,
-            "BpfByteCodeImage": "quay.io/bpfd-bytecode/go-xdp-counter:latest",
-            "BpfByteCodeFunction": "xdp_stats",
+            "BpfByteCodeImage": "quay.io/mtahhan/xsk_def_xdp_prog:latest",
+            "BpfByteCodeFunction": "xsk_def_prog",
             "drivers":[
               {
                 "name":"veth"
