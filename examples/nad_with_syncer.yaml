@@ -3,19 +3,19 @@
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: afxdp-network                                        # Name of this network, pods will request this network by name
+  name: afxdp-network
   annotations:
-    k8s.v1.cni.cncf.io/resourceName: afxdp/myPool            # Needs to match the device plugin pool name / resource type
+    k8s.v1.cni.cncf.io/resourceName: afxdp/myPool
 spec:
   config: '{
       "cniVersion": "0.3.0",
-      "type": "afxdp",                                       # CNI binary, leave as afxdp
-      "mode": "primary",                                     # CNI mode setting (required)
-      "logFile": "afxdp-cni.log",                            # CNI log file location (optional)
-      "logLevel": "debug",                                   # CNI logging level (optional)
-      "dpSyncer": true,                                      # Sync with Device Plugin over gRPC MUST BE SET for bpf map pinning
-      "skipUnloadBpf": true,                                 # Skip unloading BPF locally
-      "ipam": {                                              # CNI IPAM plugin and associated config (optional)
+      "type": "afxdp",
+      "mode": "primary",
+      "logFile": "afxdp-cni.log",
+      "logLevel": "debug",
+      "dpSyncer": true,
+      "skipUnloadBpf": true,
+      "ipam": {
         "type": "host-local",
         "subnet": "192.168.1.0/24",
         "rangeStart": "192.168.1.200",

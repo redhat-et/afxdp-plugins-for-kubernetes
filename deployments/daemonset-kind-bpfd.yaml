@@ -88,6 +88,8 @@ spec:
               mountPath: /var/log/afxdp-k8s-plugins/
             - name: cnibin
               mountPath: /opt/cni/bin/
+            - name: bpfd-maps
+              mountPath: /var/run/bpfd/fs/maps/
       volumes:
         - name: unixsock
           hostPath:
@@ -113,6 +115,9 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin/
+        - name: bpfd-maps
+          hostPath:
+            path: /var/run/bpfd/fs/maps/
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

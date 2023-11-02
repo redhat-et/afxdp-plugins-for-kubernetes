@@ -155,9 +155,11 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (string, 
 		bpfProgName := node + "-" + pm + "-" + iface + "-" + node + "-" + iface
 		for _, bpfProgram := range bpfProgramList.Items {
 			if bpfProgram.ObjectMeta.Name == bpfProgName {
-				logging.Infof("FOUND bpfProgram %v", bpfProgram)
+				time.Sleep(1 * time.Second)
+				logging.Infof("FOUND bpfProgram %s", bpfProgram.ObjectMeta.Name)
+				logging.Infof("bpfProgram.Spec.Maps %v", bpfProgram.Spec.Maps)
 				if len(bpfProgram.Spec.Maps) == 0 {
-					logging.Errorf("NO MAPS FOUND for %s", bpfProgName)
+					logging.Errorf("NO MAPS FOUND for %s", bpfProgram.ObjectMeta.Name)
 					return "", errors.New("Failed to find a map for the loaded bpf program")
 				}
 				for m, path := range bpfProgram.Spec.Maps {
