@@ -245,7 +245,6 @@ kind-load-images:  ## Load the image on the kind cluster
 	@echo
 	@echo
 
-# make KIND_CLUSTER_NAME=bpfd-deployment IMAGE=quay.io/mtahhan/cndp-map-pinning kind-load-custom-image
 .PHONY: kind-load-custom-image
 kind-load-custom-image:  ## Load the image on the kind cluster
 	@echo "****** Loading ${IMAGE}  ******"
@@ -273,17 +272,15 @@ kind-deploy: kind-undeploy kind-load-images ## Deploy the Deamonset and CNI in K
 	@echo
 	@echo
 
-# make KIND_CLUSTER_NAME=bpfd-deployment kind-undeploy-bpfd
-kind-undeploy-bpfd: ## Undeploy the Kind Deamonset
+kind-undeploy-bpfd: ## Undeploy the Kind Deamonset in a bpfd cluster
 	@echo "******  Stop Daemonset   ******"
 	@echo
 	kubectl delete -f ./deployments/daemonset-kind-bpfd.yaml --ignore-not-found=true
 	@echo
 	@echo
 
-# make KIND_CLUSTER_NAME=bpfd-deployment kind-deploy-bpfd
 .PHONY: kind-deploy-bpfd
-kind-deploy-bpfd: kind-undeploy-bpfd kind-load-images ## Deploy the Deamonset and CNI in the Kind
+kind-deploy-bpfd: kind-undeploy-bpfd kind-load-images ## Deploy the Kind Deamonset in a bpfd cluster
 	@echo "****** Deploy Daemonset  ******"
 	@echo
 	kubectl create -f ./deployments/daemonset-kind-bpfd.yaml

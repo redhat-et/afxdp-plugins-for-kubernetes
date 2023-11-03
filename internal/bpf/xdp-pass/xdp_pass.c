@@ -17,7 +17,7 @@
 #include <bpf/bpf_helpers.h>
 #include <linux/bpf.h>
 // clang-format on
-SEC("xdp/pass")
+SEC("xdp")
 int xdp_pass(struct xdp_md *ctx) { return XDP_PASS; }
 
 char _license[] SEC("license") = "Dual BSD";

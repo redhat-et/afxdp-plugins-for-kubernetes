@@ -67,7 +67,8 @@ The following prerequisites are required to run the plugins:
   - To use a Kind deployment.
   - [Kind quickstart guide](https://kind.sigs.k8s.io/docs/user/quick-start/)
   - Tested with Kind version 0.18.0
-  - **Note:** For kind, please also install [**kubeadm**](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+  - **Note:** For Kind, please also install [**kubeadm**](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+  - **Note:** For Kind, please use docker to build images.
 
 ### Development Prerequisites
 
@@ -415,10 +416,6 @@ BpfMapPinningEnable is a Boolean configuration. If set to true, will use BPF map
 
 > **_NOTE:_**  If the kernel is <= 5.18, CAP_BPF capability should be added to the container in the Pod.
 
-#### BpdClientEnable
-
-TODO, remember to disable local BPF bits if this is enabled...
-
 #### UdsTimeout
 
 UdsTimeout is an integer configuration. This value sets the amount of time, in seconds, that the UDS server will wait while there is no activity on the UDS. When this timeout limit is reached, the UDS server terminates and the UDS is deleted from the filesystem. This can be a useful setting, for example, in scenarios where large batches of pods are created together. Large batches of pods tend to take some time to spin up, so it might be beneficial to have the UDS server sit waiting a little longer for the pod to start. The maximum allowed value is 300 seconds (5 min). The minimum and default value is 30 seconds.
@@ -510,6 +507,14 @@ The example below shows a config including log settings.
 }
 ```
 
+### Ethtool Filters
+Ethtool filters can be applied to devices during CNI runtime. This setting can only be assigned to devices in a `primary` mode pool from the networkAttachmentDefinition file.
+The EthtoolCmds field is an array of strings. These strings should be formatted exactly as if setting Ethtool filters where manually from the command line. Some Ethtool filters require the device name or the IP address and in these instances, the user can substitute these with `-device-` and `-ip-` respectively. The plugins will apply the filters with the correct name and IP address when they become known during pod creation.
+
+From the [examples/network-attachment-definition.yaml](./examples/network-attachment-definition.yaml) file: **ethtoolCmds** field has two filters configured. This means the filters `ethtool -X <device> equal 5 start 3` and `ethtool --config-ntuple -device- flow-type udp4 dst-ip <ip> action` will be configured on all devices as they are being attached to the AF_XDP pods. The plugins will substitute `<device>` and `<ip>` accordingly.
+
+*Note: When setting ethtool commands in the **ethtoolCmds** field, the 'ethtool' prefix must be removed.
+
 ### Kind Cluster
 
 The kindCluster flag is used to indicate if this is a physical cluster or a Kind cluster.
@@ -536,23 +541,35 @@ The kindCluster flag is used to indicate if this is a physical cluster or a Kind
     }
 ```
 
-### Ethtool Filters
-Ethtool filters can be applied to devices during CNI runtime. This setting can only be assigned to devices in a `primary` mode pool from the networkAttachmentDefinition file.
-The EthtoolCmds field is an array of strings. These strings should be formatted exactly as if setting Ethtool filters where manually from the command line. Some Ethtool filters require the device name or the IP address and in these instances, the user can substitute these with `-device-` and `-ip-` respectively. The plugins will apply the filters with the correct name and IP address when they become known during pod creation.
 
-From the [examples/network-attachment-definition.yaml](./examples/network-attachment-definition.yaml) file: **ethtoolCmds** field has two filters configured. This means the filters `ethtool -X <device> equal 5 start 3` and `ethtool --config-ntuple -device- flow-type udp4 dst-ip <ip> action` will be configured on all devices as they are being attached to the AF_XDP pods. The plugins will substitute `<device>` and `<ip>` accordingly.
+#### bpfdClientEnable
 
-*Note: When setting ethtool commands in the **ethtoolCmds** field, the 'ethtool' prefix must be removed.
+bpfdClientEnable is a Boolean configuration. If set to true, will use bpfd to load bpf programs onto the netdevs allocated to the pod from the resource pool. By default, this is set to false.
+Should set BpfMapPinningEnable to false and UdsServerDisable to true when using this configuration.
 
-### bpfd Client
+#### bpfd
 
 bpfd is a system daemon aimed at simplifying the deployment and management of eBPF programs. Integrating the AF_XDP
 device plugin with bpfd means delegating the responsibility of loading and unloading the eBPF programs for AF_XDP applications
 to the bpfd daemonset running on each node. This means that instead of AF_XDP DP loading/unloading a BPF program, it will create/delete
-an [XdpProgram CRD](https://pkg.go.dev/github.com/bpfd-dev/bpfd@v0.2.1/bpfd-operator/apis/v1alpha1#XdpProgram) via the
-[bpfd-operator APIs](https://pkg.go.dev/github.com/bpfd-dev/bpfd@v0.2.1/bpfd-operator/apis/v1alpha1).
+an [XdpProgram CRD](https://pkg.go.dev/github.com/bpfd-dev/bpfd@v0.3.0/bpfd-operator/apis/v1alpha1#XdpProgram) via the
+[bpfd-operator APIs](https://pkg.go.dev/github.com/bpfd-dev/bpfd@v0.3.0/bpfd-operator/apis/v1alpha1).
 
 More info about bpfd can be found [here](https://bpfd.dev/#challenges-for-ebpf-in-kubernetes).
+
+Assuming a bpfd (Kind) cluster is deployed, AF_XDP DP can be deployed in that cluster by issuing the following commands:
+
+```bash
+#!/bin/bash
+make docker
+docker pull quay.io/mtahhan/cndp-map-pinning:latest
+docker pull quay.io/mtahhan/xsk_def_xdp_prog:latest
+make setup-multus
+make KIND_CLUSTER_NAME=bpfd-deployment kind-label-bpfd-cp
+make KIND_CLUSTER_NAME=bpfd-deployment IMAGE=quay.io/mtahhan/cndp-map-pinning kind-load-custom-image
+make KIND_CLUSTER_NAME=bpfd-deployment IMAGE=quay.io/mtahhan/xsk_def_xdp_prog kind-load-custom-image
+make KIND_CLUSTER_NAME=bpfd-deployment kind-deploy-bpfd
+```
 
 #### AF_XDP Bytecode image
 
@@ -565,29 +582,30 @@ that holds the AF_XDP bpf program bytecode. An example of such a program exists 
 https://github.com/bpfd-dev/bpfd.git
 ```
 
-And build docker image that specifies the `PROGRAM_TYPE`, `BYTECODE_FILENAME`, `SECTION_NAME` and `KERNEL_COMPILE_VER`.
+And build docker image that specifies the `PROGRAM_TYPE`, `BPF_FUNCTION_NAME`, `PROGRAM_NAME` ,`BYTECODE_FILENAME`, `SECTION_NAME` and `KERNEL_COMPILE_VER`.
 
 For example for the default AF_XDP eBPF program from xdp-tools [xsk_def_xdp_prog.c](https://github.com/xdp-project/xdp-tools/blob/master/lib/libxdp/xsk_def_xdp_prog.c)
 
 ```bash
-docker build  --build-arg PROGRAM_NAME=xsk_def_xdp_prog  --build-arg PROGRAM_TYPE=xdp  --build-arg BYTECODE_FILENAME=xsk_def_xdp_prog.o --build-arg SECTION_NAME=xsk_def_prog  --build-arg KERNEL_COMPILE_VER=$(uname -r)  -f packaging/container-deployment/Containerfile.bytecode  /$PATH_TO_XDP_TOOLS/xdp-tools/lib/libxdp -t quay.io/$USER/xsk_def_xdp_prog:latest
+docker build  --build-arg PROGRAM_NAME=xsk_def_xdp_prog --build-arg BPF_FUNCTION_NAME=xsk_def_prog --build-arg PROGRAM_TYPE=xdp  --build-arg BYTECODE_FILENAME=xsk_def_xdp_prog.o --build-arg KERNEL_COMPILE_VER=$(uname -r)  -f packaging/container-deployment/Containerfile.bytecode  /$PATH_TO_XDP_TOOLS/xdp-tools/lib/libxdp -t  quay.io/$USER/xsk_def_xdp_prog:latest
 ```
 
-Two pool configuration parameters have been added to allow the specification of the default OCI bytecode image and section to use,
+Two pool configuration parameters have been added to allow the specification of the OCI bytecode image and section to use,
 an example is shown below:
 
 ```yaml
-    "bpfByteCodeImage": "quay.io/bpfd-bytecode/go-xdp-counter",
-    "bpfByteCodeFunction": "xdp_stats",
+    "BpfByteCodeImage": "quay.io/mtahhan/xsk_def_xdp_prog:latest",
+    "BpfByteCodeFunction": "xsk_def_prog",
 ```
 
-In the future, we would like to make the eBPF program/bytecode selection configurable via pod annotation.
-
-#### DPCNIServer
+#### DPCNISyncerServer
 
 The bpfd integration and map pinning support in the DP introduced the need for a syncronization call from the CNI to the DP in order
 to delete/unload the XDP program and any resources for an interface being returned to the host on pod deletion. Originally the BPF
 program unload functionality was part of the CNI itself.
+
+ **Note:**  This is enabled on the CNI through
+the `dpSyncer` CNI configuration parameter . An example configuration is shown in [nad_with_syncer.yaml](examples/nad_with_syncer.yaml)
 
 ## CLOC
 

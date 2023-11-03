@@ -690,7 +690,6 @@ github.com/Venafi/vcert/v4 v4.14.3/go.mod h1:IL+6LA8QRWZbmcMzIr/vRhf9Aa6XDM2cQO5
 github.com/adrg/strutil v0.2.3/go.mod h1:+SNxbiH6t+O+5SZqIj5n/9i5yUjR+S3XXVrjEcN2mxg=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
 github.com/ahmetb/gen-crd-api-reference-docs v0.2.1-0.20201224172655-df869c1245d4/go.mod h1:TdjdkYhlOifCQWPs1UdTma97kQQMozf5h26hTuG70u8=
-github.com/ahmetb/gen-crd-api-reference-docs v0.3.0/go.mod h1:TdjdkYhlOifCQWPs1UdTma97kQQMozf5h26hTuG70u8=
 github.com/ajstarks/deck v0.0.0-20200831202436-30c9fc6549a9/go.mod h1:JynElWSGnm/4RlzPXRlREEwqTHAN3T56Bv2ITsFT3gY=
 github.com/ajstarks/deck/generate v0.0.0-20210309230005-c3f852c02e19/go.mod h1:T13YZdzov6OU0A1+RfKZiZN9ca6VeKdBdyDV+BY97Tk=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
@@ -752,8 +751,8 @@ github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2y
 github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869/go.mod h1:Ekp36dRnpXw/yCqJaO+ZrUyxD+3VXMFFr56k5XYrpB4=
 github.com/boombuler/barcode v1.0.0/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
-github.com/bpfd-dev/bpfd v0.2.0 h1:fNiVdjkZryNnkjZeSQN1BuGflDLZFnSRkx0Ic94f3Oo=
-github.com/bpfd-dev/bpfd v0.2.0/go.mod h1:PnpeF4m4m1m5DdMn36wnbCxvJqasYGOfNlVyFDK/6dE=
+github.com/bpfd-dev/bpfd v0.3.0 h1:bLYIn+MLPRleM86jVFCna1wsVYQjmXUFwz5TgVquBuA=
+github.com/bpfd-dev/bpfd v0.3.0/go.mod h1:zglZCMt8oZSXV+oprlEX7l0UkVAa+M/5u4b5x8Bz3gI=
 github.com/bshuster-repo/logrus-logstash-hook v0.4.1/go.mod h1:zsTqEiSzDgAa/8GZR7E1qaXrhYNDKBYy5/dWPTIflbk=
 github.com/bshuster-repo/logrus-logstash-hook v1.0.0/go.mod h1:zsTqEiSzDgAa/8GZR7E1qaXrhYNDKBYy5/dWPTIflbk=
 github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44/go.mod h1:bbYlZJ7hK1yFx9hf58LP0zeX7UjIGs20ufpu3evjr+s=
@@ -954,8 +953,6 @@ github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZm
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/digitalocean/godo v1.65.0/go.mod h1:p7dOjjtSBqCTUksqtA5Fd3uaKs9kyTq2xcz76ulEJRU=
 github.com/distribution/distribution/v3 v3.0.0-20210804104954-38ab4c606ee3/go.mod h1:gt38b7cvVKazi5XkHvINNytZXgTEntyhtyM3HQz46Nk=
-github.com/distribution/reference v0.5.0 h1:/FUIFXtfc/x2gpa5/VGfiGLuOIdYa1t65IKK2OFGvA0=
-github.com/distribution/reference v0.5.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
 github.com/dnaeon/go-vcr v1.0.1/go.mod h1:aBB1+wY4s93YsC3HHjMBMrwTj2R9FHDzUr9KyGc8n1E=
 github.com/docker/cli v0.0.0-20191017083524-a8ff7f821017/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli v20.10.7+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
@@ -1648,7 +1645,6 @@ github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420/go.mod h1
 github.com/opencontainers/go-digest v0.0.0-20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
 github.com/opencontainers/go-digest v1.0.0-rc1.0.20180430190053-c9281466c8b2/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
-github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.0.0/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
