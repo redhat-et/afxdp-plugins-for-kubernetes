@@ -7,7 +7,8 @@ metadata:
 spec:
   containers:
     - name: cndp-0
-      command: ["tail", "-f", "/dev/null"]
+      command: ["/bin/bash"]
+      args: ["-c", "./jsonc_gen.sh -kp ; cndpfwd -c config.jsonc lb;"]
       image:  quay.io/mtahhan/cndp-map-pinning:latest
       imagePullPolicy: IfNotPresent
       securityContext:

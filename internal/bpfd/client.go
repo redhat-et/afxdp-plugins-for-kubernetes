@@ -2,6 +2,7 @@ package bpfd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -148,25 +149,17 @@ func (b *BpfdClient) SubmitXdpProg(iface, node, pm, image, sec string) (string, 
 		return "", errors.Wrapf(err, "Failed to get bpf prog resources: %v", err)
 	}
 
-	var xskmap string
-
-	// Try to get the xspmap path from the bpf program resource
+	xskmap := ""
 	if bpfProgramList != nil {
 		bpfProgName := node + "-" + pm + "-" + iface + "-" + node + "-" + iface
 		for _, bpfProgram := range bpfProgramList.Items {
 			if bpfProgram.ObjectMeta.Name == bpfProgName {
-				time.Sleep(1 * time.Second)
-				logging.Infof("FOUND bpfProgram %s", bpfProgram.ObjectMeta.Name)
-				logging.Infof("bpfProgram.Spec.Maps %v", bpfProgram.Spec.Maps)
-				if len(bpfProgram.Spec.Maps) == 0 {
-					logging.Errorf("NO MAPS FOUND for %s", bpfProgram.ObjectMeta.Name)
-					return "", errors.New("Failed to find a map for the loaded bpf program")
+				id, ok := bpfProgram.Annotations["bpfd.dev/ProgramId"]
+				if !ok {
+					logging.Errorf("BpfProgram %s does not have a program id", bpfProgName)
+					return "", errors.New("BpfProgram does not have a program id")
 				}
-				for m, path := range bpfProgram.Spec.Maps {
-					logging.Infof("map: %v", m)
-					xskmap = path
-				}
-
+				xskmap = fmt.Sprintf("/run/bpfd/fs/maps/%s/xsks_map", id)
 			}
 		}
 	}

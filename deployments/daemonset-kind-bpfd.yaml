@@ -89,7 +89,8 @@ spec:
             - name: cnibin
               mountPath: /opt/cni/bin/
             - name: bpfd-maps
-              mountPath: /var/run/bpfd/fs/maps/
+              mountPath: /run/bpfd/fs/maps/
+              readOnly: true
       volumes:
         - name: unixsock
           hostPath:
@@ -117,7 +118,7 @@ spec:
             path: /opt/cni/bin/
         - name: bpfd-maps
           hostPath:
-            path: /var/run/bpfd/fs/maps/
+            path: /run/bpfd/fs/maps/
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
