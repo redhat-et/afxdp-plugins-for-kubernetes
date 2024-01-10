@@ -298,10 +298,11 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 					return &response, err
 				}
 
-				logging.Debugf("mapping %s to %s", xskmap, constants.Bpf.BpfMapPodPath)
+				containerMapPath := constants.Bpf.BpfMapPodPath + device.Name() + constants.Bpf.Xsk_map
+				logging.Debugf("mapping %s to %s", xskmap, containerMapPath)
 				cresp.Mounts = append(cresp.Mounts, &pluginapi.Mount{
 					HostPath:      xskmap,
-					ContainerPath: constants.Bpf.BpfMapPodPath,
+					ContainerPath: containerMapPath,
 					ReadOnly:      false,
 				})
 
