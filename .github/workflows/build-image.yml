@@ -1,4 +1,4 @@
-name: Build Image CI
+name: Build AF_XDP Device Plugin Image
 
 on:
   push:
@@ -15,6 +15,7 @@ jobs:
       matrix:
         include:
           - registry: quay.io
+            organization: afxdp-plugins-for-kubernetes
             repository: afxdp-device-plugin
             image: afxdp-device-plugin
             dockerfile: ./images/amd64.dockerfile
@@ -36,7 +37,7 @@ jobs:
        uses: docker/build-push-action@v5
        with:
           push: true
-          tags: ${{matrix.registry}}/${{matrix.repository}}/${{matrix.image}}:${{matrix.tags}}
+          tags: ${{matrix.registry}}/${{matrix.organization}}/${{matrix.repository}}/${{matrix.image}}:${{matrix.tags}}
           labels: 'latest'
           file: ${{ matrix.dockerfile }}
           build-args: ${{ matrix.build_args }}
