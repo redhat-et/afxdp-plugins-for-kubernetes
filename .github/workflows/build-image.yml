@@ -1,0 +1,43 @@
+name: Build Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    paths: [.github/workflows/build-image.yml]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - registry: quay.io
+            repository: afxdp-device-plugin
+            image: afxdp-device-plugin
+            dockerfile: ./images/amd64.dockerfile
+            context: .
+            tags: 'latest'
+
+    steps:
+     - uses: actions/checkout@v4
+    
+     - name: Login to quay.io/afxdp-plugins-for-kubernetes
+       uses: redhat-actions/podman-login@v1
+       if: ${{ github.event_name == 'push' && matrix.repository == 'afxdp-device-plugin'}}
+       with:
+          registry: ${{ matrix.image.registry }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+          
+     - name: Build and push image
+       uses: docker/build-push-action@v5
+       with:
+          push: true
+          tags: ${{matrix.registry}}/${{matrix.repository}}/${{matrix.image}}:${{matrix.tags}}
+          labels: 'latest'
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build_args }}
+          context: ${{ matrix.context }}
