@@ -28,7 +28,7 @@ jobs:
        uses: redhat-actions/podman-login@v1
        if: ${{ github.event_name == 'push' && matrix.repository == 'afxdp-device-plugin'}}
        with:
-          registry: ${{ matrix.image.registry }}
+          registry: ${{ matrix.registry }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_ROBOT_TOKEN }}
           
