@@ -17,12 +17,13 @@ package uds
 
 import (
 	"fmt"
-	fuzz "github.com/google/gofuzz"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/logformats"
-	logging "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"time"
+
+	fuzz "github.com/google/gofuzz"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/logformats"
+	logging "github.com/sirupsen/logrus"
 )
 
 const (

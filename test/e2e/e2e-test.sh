@@ -4,9 +4,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -117,7 +117,7 @@ run() {
 	sleep 10
 
 	while :; do
-		if [ "$ci_run" = true ]; then 
+		if [ "$ci_run" = true ]; then
 			run_ci_pods
 		else
 			run_local_pods
@@ -298,9 +298,9 @@ run_ci_pods() {
 			for (( j=1; j<=containers; j++ ))
 			do
 				echo "***** Env vars Container $j *****"
-				kubectl exec -i "$pod" --container afxdp$j -- env
+				kubectl exec -i "$pod" --container afxdp"$j" -- env
 				echo "***** UDS Test Container $j *****"
-				kubectl exec -i "$pod" --container afxdp$j -- cat /tmp/udsTest.txt
+				kubectl exec -i "$pod" --container afxdp"$j" -- cat "/tmp/udsTest.txt"
 				echo
 			done
 		done
@@ -313,7 +313,7 @@ run_ci_pods() {
 
 	echo "*****************************************************"
 	echo "*                  Delete Pods                      *"
-	echo "*****************************************************"	
+	echo "*****************************************************"
 	kubectl delete pods -l app=afxdp-e2e -n default --grace-period=0
 }
 

@@ -19,8 +19,8 @@ import (
 	"context"
 	"net"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	pb "github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncer"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	pb "github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncer"
 	logging "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

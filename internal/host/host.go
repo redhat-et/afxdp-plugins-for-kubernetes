@@ -17,7 +17,6 @@ package host
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -80,7 +79,7 @@ func (r *handler) HasLibxdp() (bool, []string, error) {
 	var foundLibs []string
 
 	for _, path := range libPaths {
-		files, err := ioutil.ReadDir(path)
+		files, err := os.ReadDir(path)
 		if err != nil {
 			if strings.Contains(err.Error(), "no such file or directory") {
 				logging.Debugf("Directory " + path + " does not exist")

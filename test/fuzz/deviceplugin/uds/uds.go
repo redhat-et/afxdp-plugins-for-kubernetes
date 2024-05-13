@@ -16,11 +16,12 @@
 package uds
 
 import (
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/logformats"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/uds"
-	logging "github.com/sirupsen/logrus"
 	"os"
 	"time"
+
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/logformats"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/uds"
+	logging "github.com/sirupsen/logrus"
 )
 
 const (

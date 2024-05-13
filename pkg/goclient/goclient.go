@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/uds"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/host"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/uds"
 )
 
 var (

@@ -18,8 +18,8 @@ package networking
 import (
 	"strconv"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
 	"github.com/pkg/errors"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
 	logging "github.com/sirupsen/logrus"
 )
 

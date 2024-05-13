@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/udsserver"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/udsserver"
 	"github.com/stretchr/testify/assert"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )

@@ -22,9 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/tools"
-	"github.com/intel/afxdp-plugins-for-kubernetes/pkg/subfunctions"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/pkg/subfunctions"
 	_ethtool "github.com/safchain/ethtool"
 	logging "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"

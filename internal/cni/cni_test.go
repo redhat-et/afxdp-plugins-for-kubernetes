@@ -17,12 +17,13 @@ package cni
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestGetConfig(t *testing.T) {

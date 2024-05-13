@@ -21,10 +21,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
-	pb "github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncer"
 	"github.com/pkg/errors"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	pb "github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncer"
 	logging "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -101,7 +101,9 @@ func (s *SyncerServer) StopGRPCSyncer() {
 		s.grpcServer.Stop()
 		s.grpcServer = nil
 	}
-	s.cleanup()
+	if err := s.cleanup(); err != nil {
+		logging.Error("Error stopping the GRPC Syncer")
+	}
 }
 
 func NewSyncerServer() (*SyncerServer, error) {

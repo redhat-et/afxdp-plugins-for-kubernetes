@@ -17,14 +17,15 @@ package uds
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
-	logging "github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/host"
+	logging "github.com/sirupsen/logrus"
 )
 
 /*
