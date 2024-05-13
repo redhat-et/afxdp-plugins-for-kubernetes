@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/tools"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/udsserver"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/udsserver"
 	logging "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -132,7 +132,7 @@ Terminate is called it terminate the PoolManager.
 func (pm *PoolManager) Terminate() error {
 	pm.stopGRPC()
 	if err := pm.cleanup(); err != nil {
-		logging.Infof("Cleanup error: %v", err)
+		logging.Errorf("Cleanup error: %v", err)
 	}
 	logging.Infof(pm.DevicePrefix + "/" + pm.Name + " terminated")
 
@@ -141,7 +141,9 @@ func (pm *PoolManager) Terminate() error {
 	}
 
 	if pm.BpfMapPinningEnable {
-		pm.Pbm.Manager.CleanupMapManager()
+		if err := pm.Pbm.Manager.CleanupMapManager(); err != nil {
+			logging.Errorf("Cleanup error: %v", err)
+		}
 	}
 
 	return nil

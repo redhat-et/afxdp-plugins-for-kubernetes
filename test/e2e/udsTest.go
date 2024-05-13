@@ -16,12 +16,13 @@
 package main
 
 import (
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/uds"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/uds"
 )
 
 const (

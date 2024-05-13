@@ -21,10 +21,10 @@ import (
 	"syscall"
 
 	"github.com/google/uuid"
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
 	"github.com/moby/sys/mount"
 	"github.com/pkg/errors"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/host"
 	logging "github.com/sirupsen/logrus"
 )
 

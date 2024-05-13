@@ -16,13 +16,12 @@
 package deviceplugin
 
 import (
-	"io/ioutil"
 	"os"
 
-	dp "github.com/intel/afxdp-plugins-for-kubernetes/internal/deviceplugin"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
+	dp "github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/deviceplugin"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/host"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
 )
 
 const (
@@ -47,7 +46,7 @@ func Fuzz(data []byte) int {
 		}
 	}
 
-	tmpfile, err := ioutil.TempFile(tempDirectory, "config_")
+	tmpfile, err := os.CreateTemp(tempDirectory, "config_")
 	if err != nil {
 		os.Remove(tmpfile.Name())
 		panic(1)

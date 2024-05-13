@@ -18,8 +18,9 @@ package cni
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/cni"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/cni"
 	"k8s.io/apimachinery/pkg/util/uuid"
 )
 

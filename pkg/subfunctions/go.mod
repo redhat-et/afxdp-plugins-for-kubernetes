@@ -1,4 +1,4 @@
-module github.com/intel/afxdp-plugins-for-kubernetes/pkg/subfunctions
+module github.com/redhat-et/afxdp-plugins-for-kubernetes/pkg/subfunctions
 
 go 1.13
 

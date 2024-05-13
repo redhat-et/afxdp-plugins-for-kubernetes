@@ -19,15 +19,15 @@ package deviceplugin
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strconv"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/tools"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/host"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
 	logging "github.com/sirupsen/logrus"
 )
 
@@ -394,7 +394,7 @@ func readConfigFile(file string) error {
 	cfgFile = &configFile{}
 
 	logging.Infof("Reading config file: %s", file)
-	raw, err := ioutil.ReadFile(file)
+	raw, err := os.ReadFile(file)
 	if err != nil {
 		logging.Errorf("Error reading config file: %v", err)
 		return err

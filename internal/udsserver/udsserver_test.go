@@ -18,9 +18,9 @@ package udsserver
 import (
 	"testing"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/resourcesapi"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/uds"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/resourcesapi"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/uds"
 	"gotest.tools/assert"
 )
 

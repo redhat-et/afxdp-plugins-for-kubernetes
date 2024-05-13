@@ -23,13 +23,13 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/deviceplugin"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/host"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/logformats"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/networking"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/tools"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/deviceplugin"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/host"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/logformats"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
 	logging "github.com/sirupsen/logrus"
 )
 

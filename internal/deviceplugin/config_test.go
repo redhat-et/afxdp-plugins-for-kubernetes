@@ -17,12 +17,12 @@ package deviceplugin
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadConfigFile(t *testing.T) {
@@ -1136,10 +1136,10 @@ func TestReadConfigFile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfgFile = nil
 			content := []byte(tc.configFile)
-			dir, dirErr := ioutil.TempDir("/tmp", "test-afxdp-")
+			dir, dirErr := os.MkdirTemp("/tmp", "test-afxdp-")
 			require.NoError(t, dirErr, "Can't create temporary directory")
 			testDir := filepath.Join(dir, "tmpfile")
-			err := ioutil.WriteFile(testDir, content, 0666)
+			err := os.WriteFile(testDir, content, 0666)
 			require.NoError(t, err, "Can't create temporary file")
 
 			defer os.RemoveAll(dir)
@@ -1180,14 +1180,15 @@ func FuzzReadConfigFile(f *testing.F) {
 	f.Fuzz(func(t *testing.T, fileContents string) {
 		cfgFile = nil
 		content := []byte(fileContents)
-		dir, dirErr := ioutil.TempDir("/tmp", "test-afxdp-")
+		dir, dirErr := os.MkdirTemp("/tmp", "test-afxdp-")
 		require.NoError(t, dirErr, "Can't create temporary directory")
 		testDir := filepath.Join(dir, "tmpfile")
-		err := ioutil.WriteFile(testDir, content, 0666)
+		err := os.WriteFile(testDir, content, 0666)
 		require.NoError(t, err, "Can't create temporary file")
 
 		defer os.RemoveAll(dir)
 
-		readConfigFile(testDir)
+		err = readConfigFile(testDir)
+		require.NoError(t, err, "Can't readConfigFile")
 	})
 }

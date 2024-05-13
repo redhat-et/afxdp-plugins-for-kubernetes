@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/bpf"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/resourcesapi"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/uds"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/resourcesapi"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/uds"
 	logging "github.com/sirupsen/logrus"
 )
 

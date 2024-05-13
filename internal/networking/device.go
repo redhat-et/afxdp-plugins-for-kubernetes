@@ -17,11 +17,12 @@ package networking
 
 import (
 	"fmt"
-	"github.com/intel/afxdp-plugins-for-kubernetes/constants"
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/tools"
-	logging "github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
+
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
+	logging "github.com/sirupsen/logrus"
 )
 
 /*

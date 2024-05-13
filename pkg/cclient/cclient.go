@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/intel/afxdp-plugins-for-kubernetes/internal/uds"
-	"github.com/intel/afxdp-plugins-for-kubernetes/pkg/goclient"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/uds"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/pkg/goclient"
 )
 
 func main() {

@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/intel/afxdp-plugins-for-kubernetes/internal/dpcnisyncer";
+option go_package = "github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncer";
 
 package dpcnisyncer_proto;
 
