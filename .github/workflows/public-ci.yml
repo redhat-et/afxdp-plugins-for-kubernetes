@@ -39,8 +39,8 @@ jobs:
         go-version: 1.19
 
     - name: Install libbpf and libxdp
-      run: | 
-          sudo apt update 
+      run: |
+          sudo apt update
           sudo apt install -y wget build-essential golang
           sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf1_1.1.0-1_amd64.deb
           sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_1.1.0-1_amd64.deb
@@ -54,7 +54,7 @@ jobs:
           sudo apt install -y llvm
           sudo apt install -y gcc-multilib
 
- 
+
 
     - name: Run build
       run: make build
@@ -70,17 +70,17 @@ jobs:
         go-version: 1.19
 
     - name: Install libbpf and libxdp
-      run: | 
-          sudo apt update 
+      run: |
+          sudo apt update
           sudo apt install -y wget build-essential golang
-          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf1_1.1.0-1_amd64.deb
-          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_1.1.0-1_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.3.0-2ubuntu2_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev_1.3.0-2ubuntu2_amd64.deb
-          sudo apt install -y ./libbpf1_1.1.0-1_amd64.deb
-          sudo apt install -y ./libbpf-dev_1.1.0-1_amd64.deb
-          sudo apt install -y ./libxdp1_1.3.0-2ubuntu2_amd64.deb
-          sudo apt install -y ./libxdp-dev_1.3.0-2ubuntu2_amd64.deb
+          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf0_0.5.0-1_amd64.deb
+          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_0.5.0-1_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.4.2-1ubuntu4_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev1_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libbpf0_0.5.0-1_amd64.deb
+          sudo apt install -y ./libbpf-dev_0.5.0-1_amd64.deb
+          sudo apt install -y ./libxdp1_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libxdp-dev1_1.4.2-1ubuntu4_amd64.deb
 
     - name: Install staticcheck
       run: go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -99,8 +99,8 @@ jobs:
         go-version: 1.19
 
     - name: Install libbpf and libxdp
-      run: | 
-          sudo apt update 
+      run: |
+          sudo apt update
           sudo apt install -y wget build-essential golang
           sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf1_1.1.0-1_amd64.deb
           sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_1.1.0-1_amd64.deb
@@ -120,10 +120,10 @@ jobs:
 # Trivy Scan
   trivy-scan:
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       contents: read
       security-events: write
-    steps: 
+    steps:
 
     - name: Checkout code
       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -144,7 +144,7 @@ jobs:
       run: docker save -o vul-image.tar afxdp-device-plugin:latest
 
 
-    - name: Run Trivy on tarballed image 
+    - name: Run Trivy on tarballed image
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: /github/workspace/vul-image.tar
@@ -162,5 +162,5 @@ jobs:
     - name: Print sarif file
       run: cat < trivy-results.sarif
 
-    - name: Print image sarif file 
+    - name: Print image sarif file
       run: cat trivy-image-results.sarif
