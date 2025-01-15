@@ -42,14 +42,14 @@ jobs:
       run: |
           sudo apt update
           sudo apt install -y wget build-essential golang
-          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf1_1.1.0-1_amd64.deb
-          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_1.1.0-1_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.3.0-2ubuntu2_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev_1.3.0-2ubuntu2_amd64.deb
-          sudo apt install -y ./libbpf1_1.1.0-1_amd64.deb
-          sudo apt install -y ./libbpf-dev_1.1.0-1_amd64.deb
-          sudo apt install -y ./libxdp1_1.3.0-2ubuntu2_amd64.deb
-          sudo apt install -y ./libxdp-dev_1.3.0-2ubuntu2_amd64.deb
+          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf0_0.5.0-1_amd64.deb
+          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_0.5.0-1_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.4.2-1ubuntu4_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libbpf0_0.5.0-1_amd64.deb
+          sudo apt install -y ./libbpf-dev_0.5.0-1_amd64.deb
+          sudo apt install -y ./libxdp1_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libxdp-dev_1.4.2-1ubuntu4_amd64.deb
           sudo apt install -y clang
           sudo apt install -y llvm
           sudo apt install -y gcc-multilib
@@ -76,11 +76,11 @@ jobs:
           sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf0_0.5.0-1_amd64.deb
           sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_0.5.0-1_amd64.deb
           sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.4.2-1ubuntu4_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev1_1.4.2-1ubuntu4_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev_1.4.2-1ubuntu4_amd64.deb
           sudo apt install -y ./libbpf0_0.5.0-1_amd64.deb
           sudo apt install -y ./libbpf-dev_0.5.0-1_amd64.deb
           sudo apt install -y ./libxdp1_1.4.2-1ubuntu4_amd64.deb
-          sudo apt install -y ./libxdp-dev1_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libxdp-dev_1.4.2-1ubuntu4_amd64.deb
 
     - name: Install staticcheck
       run: go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -102,14 +102,14 @@ jobs:
       run: |
           sudo apt update
           sudo apt install -y wget build-essential golang
-          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf1_1.1.0-1_amd64.deb
-          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_1.1.0-1_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.3.0-2ubuntu2_amd64.deb
-          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev_1.3.0-2ubuntu2_amd64.deb
-          sudo apt install -y ./libbpf1_1.1.0-1_amd64.deb
-          sudo apt install -y ./libbpf-dev_1.1.0-1_amd64.deb
-          sudo apt install -y ./libxdp1_1.3.0-2ubuntu2_amd64.deb
-          sudo apt install -y ./libxdp-dev_1.3.0-2ubuntu2_amd64.deb
+          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf0_0.5.0-1_amd64.deb
+          sudo wget http://security.ubuntu.com/ubuntu/pool/main/libb/libbpf/libbpf-dev_0.5.0-1_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp1_1.4.2-1ubuntu4_amd64.deb
+          sudo wget https://mirrors.edge.kernel.org/ubuntu/pool/main/x/xdp-tools/libxdp-dev_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libbpf0_0.5.0-1_amd64.deb
+          sudo apt install -y ./libbpf-dev_0.5.0-1_amd64.deb
+          sudo apt install -y ./libxdp1_1.4.2-1ubuntu4_amd64.deb
+          sudo apt install -y ./libxdp-dev_1.4.2-1ubuntu4_amd64.deb
           sudo apt install -y clang
           sudo apt install -y llvm
           sudo apt install -y gcc-multilib
