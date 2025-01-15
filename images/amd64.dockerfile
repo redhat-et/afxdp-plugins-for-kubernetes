@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.20@sha256:efe38cb419e2b2012f66d1782d2efe2fd8884c71d9f342581e1697ba9047b5f8 AS cnibuilder
+FROM public.ecr.aws/docker/library/golang:1.20@sha256:efe38cb419e2b2012f66d1782d2efe2fd8884c71d9f342581e1697ba9047b5f8 AS cnibuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 RUN apt-get update \
@@ -22,7 +22,7 @@ RUN apt-get update \
 && apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends gcc-multilib=4:12.2.0-3 \
 && make buildcni
 
-FROM golang:1.20-alpine@sha256:ebceb16dc094769b6e2a393d51e0417c19084ba20eb8967fb3f7675c32b45774 AS dpbuilder
+FROM public.ecr.aws/docker/library/golang:1.20-alpine@sha256:ebceb16dc094769b6e2a393d51e0417c19084ba20eb8967fb3f7675c32b45774 AS dpbuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 RUN apk add --no-cache build-base~=0.5-r3 \
@@ -34,7 +34,7 @@ RUN apk add --no-cache build-base~=0.5-r3 \
 && apk add --no-cache \
 && make builddp
 
-FROM amd64/alpine:3.18@sha256:25fad2a32ad1f6f510e528448ae1ec69a28ef81916a004d3629874104f8a7f70
+FROM public.ecr.aws/docker/library/alpine:3.18@sha256:25fad2a32ad1f6f510e528448ae1ec69a28ef81916a004d3629874104f8a7f70
 RUN apk --no-cache -U add iproute2-rdma~=6.3.0-r0 acl~=2.3 \
       && apk add --no-cache xdp-tools~=1.2.10-r0
 COPY --from=cnibuilder /usr/src/afxdp_k8s_plugins/bin/afxdp /afxdp/afxdp
