@@ -138,7 +138,7 @@ jobs:
         severity: 'CRITICAL'
 
     - name: Build Docker image
-      run: make docker
+      run: make image
 
     - name: Generate .tar image
       run: docker save -o vul-image.tar afxdp-device-plugin:latest
