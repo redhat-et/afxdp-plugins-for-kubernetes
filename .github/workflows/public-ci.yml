@@ -163,13 +163,12 @@ jobs:
       run: make image
 
     - name: Generate .tar image
-      run: docker save -o vul-image.tar afxdp-device-plugin:latest
-
+      run: make generate-tar-image
 
     - name: Run Trivy on tarballed image
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: /github/workspace/vul-image.tar
+        image-ref: ${GITHUB_WORKSPACE}/vul-image.tar
         scan-type: 'fs'
         ignore-unfixed: false
         format: 'sarif'

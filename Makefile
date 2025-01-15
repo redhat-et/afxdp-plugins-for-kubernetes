@@ -70,8 +70,12 @@ buildcni: buildc
 
 build: builddp buildcni
 
-fixup:
+##@ Workflow targets.
+fixup: ## Fixup for ubuntu
 	@sed -i "s/LDFLAGS: -L. -lxdp -lbpf -lelf -lz/LDFLAGS: -L. -lxdp -lbpf -lelf -lz -lzstd/g" internal/bpf/bpfWrapper.go
+
+generate-tar-image: ## Fixup for Trivy
+	$(CTR_CMD) save -o vul-image.tar afxdp-device-plugin:latest
 
 ##@ Container build.
 image-builder-check:
