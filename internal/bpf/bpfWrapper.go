@@ -19,7 +19,7 @@ package bpf
 //#include <xdp/libxdp.h>
 //#include <xdp/xsk.h>
 //#cgo CFLAGS: -I.
-//#cgo LDFLAGS: -L. -lxdp -lbpf -lelf -lz
+//#cgo LDFLAGS: -L. -lxdp -lbpf -lelf -lz -lzstd
 //#include "bpfWrapper.h"
 //#include "log.h"
 import "C"
