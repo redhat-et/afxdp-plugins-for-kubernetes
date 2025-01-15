@@ -70,6 +70,9 @@ buildcni: buildc
 
 build: builddp buildcni
 
+fixup:
+	@sed -i "s/LDFLAGS: -L. -lxdp -lbpf -lelf -lz/LDFLAGS: -L. -lxdp -lbpf -lelf -lz -lzstd/g" internal/bpf/bpfWrapper.go
+
 ##@ Container build.
 image-builder-check:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
