@@ -62,7 +62,7 @@ jobs:
           && pkg-config --libs --static libelf
 
     - name: Run build
-      run: make build
+      run: make fixup && make build
 
 # go-static-tools scans code base and packages using go-vet, go mod verify and staticcheck
   go-static-tools:
@@ -98,7 +98,7 @@ jobs:
           && pkg-config --libs --static libelf
 
     - name: Install staticcheck
-      run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      run: go install honnef.co/go/tools/cmd/staticcheck@v0.4.0
 
     - name: run static analysis
       run: make static-ci
