@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+export CTR_CMD?=$(or $(shell command -v podman), $(shell command -v docker))
 
 .PHONY: help
 help: ## Display this help.
@@ -69,29 +70,14 @@ buildcni: buildc
 
 build: builddp buildcni
 
-##@ General Build - assumes K8s environment is already setup
-docker: ## Build docker image
-	@echo "******  Docker Image    ******"
-	@echo
-	docker build -t afxdp-device-plugin -f images/amd64.dockerfile .
-	@echo
-	@echo
+##@ Container build.
+image-builder-check:
+	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
 
-podman: ## Build podman image
-	@echo "******  Podman Image    ******"
-	@echo
-	podman build -t afxdp-device-plugin -f images/amd64.dockerfile .
-	@echo
-	@echo
+image: image-builder-check ## Build container image
+	 $(CTR_CMD) build -t afxdp-device-plugin -f images/amd64.dockerfile .
 
-image:
-	 if $(MAKE) podman; then \
-	  echo "Podman build succeeded"; \
-	 else \
-	  echo "Podman build failed, trying docker.."; \
-	 $(MAKE) docker; \
-	 fi
-
+##@ Deployment - assumes K8s environment is already setup
 undeploy: ## Undeploy the Deamonset
 	@echo "******  Stop Daemonset   ******"
 	@echo
