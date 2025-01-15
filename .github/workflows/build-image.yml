@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - IMAGE_NAME: afxdp-dp-plugin
+          - IMAGE_NAME: afxdp-device-plugin
             IMAGE_FILE: ./images/amd64.dockerfile
             PLATFORMS: linux/amd64
             LABEL: latest
