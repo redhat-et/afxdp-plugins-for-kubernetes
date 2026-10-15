@@ -267,9 +267,8 @@ func (m *mapManager) GetName() string {
 GetMaps
 */
 func (m *mapManager) GetMaps() (map[string]string, error) {
-
-	if m.maps != nil {
-		return nil, errors.New("No Maps found")
+	if m.maps == nil {
+		return nil, errors.New("no maps found")
 	}
 	return m.maps, nil
 }
@@ -278,15 +277,16 @@ func (m *mapManager) GetMaps() (map[string]string, error) {
 GetBPFFS
 */
 func (m *mapManager) GetBPFFS(dev string) (string, error) {
-
-	_, err := m.GetMaps()
+	maps, err := m.GetMaps()
 	if err != nil {
-		if p, ok := m.maps[dev]; ok {
-			return p, nil
-		}
+		return "", err
 	}
 
-	return "", errors.Wrapf(err, "Couldn't find any maps for dev %s: %v", dev, err.Error())
+	if p, ok := maps[dev]; ok {
+		return p, nil
+	}
+
+	return "", errors.Errorf("couldn't find any maps for dev %s", dev)
 }
 
 func (m *mapManager) DeleteBPFFS(dev string) error {

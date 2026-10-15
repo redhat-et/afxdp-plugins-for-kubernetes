@@ -296,6 +296,7 @@ func (s *server) handleBusyPollRequest(request string, fd int) error {
 		if err := s.write(constants.Uds.Handshake.ResponseBusyPollNak); err != nil {
 			return err
 		}
+		return nil
 	}
 
 	words := strings.Split(request, ",")
