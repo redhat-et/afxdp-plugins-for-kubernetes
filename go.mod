@@ -18,6 +18,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	google.golang.org/grpc v1.82.1
+	google.golang.org/protobuf v1.36.11
 	gotest.tools v2.2.0+incompatible
 	k8s.io/apimachinery v0.31.3
 	k8s.io/kubelet v0.31.3
@@ -36,7 +37,6 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

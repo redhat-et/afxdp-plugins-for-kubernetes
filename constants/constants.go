@@ -88,6 +88,16 @@ var (
 	bpfMapPodPath = "/tmp/afxdp_dp/"
 	xsk_map       = "/xsks_map"
 
+	/* bpfman */
+	bpfmanSocketPath          = "/run/bpfman-sock/bpfman.sock"       // default bpfman gRPC unix socket
+	bpfmanDefaultBytecodeFile = "/afxdp/xdp_afxdp_redirect_bpfman.o" // default XDP bytecode loaded via bpfman, shipped in the DP image
+	bpfmanDefaultFunctionName = "xdp_afxdp_redirect"                 // default XDP function name within the bytecode object
+	bpfmanDefaultPriority     = int32(10)                            // default XDP priority, lower runs earlier in the dispatcher chain
+	bpfmanPriorityMin         = int32(1)                             // minimum XDP priority
+	bpfmanPriorityMax         = int32(10000)                         // maximum XDP priority
+	bpfmanProgramNamePrefix   = "afxdp"                              // prefix for bpfman.io/ProgramName metadata: afxdp-<pool>-<netdev>
+	bpfmanValidNameRegex      = `^[a-zA-Z0-9_.:/-]+$`                // regex to check a bytecode file path or image URL
+
 	udsDirFileMode = 0700 // permissions for the directory in which we create our uds sockets
 
 	/* Handshake*/
@@ -107,8 +117,15 @@ var (
 	handshakeResponseBadRequest  = "/nak"                  // general non-acknowledgement response, usually indicates a bad request
 	handshakeResponseError       = "/error"                // general error occurred response, indicates an error occurred on the device plugin end
 
-	/*EthtoolFilters*/
+	/* EthtoolFilter*/
 	ethtoolFilterRegex = `^[a-zA-Z0-9-:.-/\s/g]+$` // regex to validate ethtool filter commands.
+
+	/* bpfman socket attribute naming */
+	bpfmanCsiDriverName = "csi.bpfman.io" // bpfman CSI driver name used in pod volume definitions
+
+	/* bpfman CSI map path inside pods */
+	bpfmanCsiMapPodPath = "/run/xdp/maps/" // conventional mountPath for the bpfman CSI volume exposing XSKMAPs
+	bpfmanCsiMapName    = "xsks_map"       // XSKMAP name pinned by the XDP programs loaded via bpfman
 )
 
 /* Public variables and types */
@@ -137,6 +154,8 @@ var (
 	EthtoolFilter ethtoolFilter
 	/* Bpf contains constants related to the BPF Map pinning */
 	Bpf bpf
+	/* Bpfman contains constants related to bpfman integration */
+	Bpfman bpfmanConf
 )
 
 type cni struct {
@@ -226,6 +245,20 @@ type bpf struct {
 	PinMapBaseDir string
 	BpfMapPodPath string
 	Xsk_map       string
+}
+
+type bpfmanConf struct {
+	SocketPath             string
+	DefaultBytecodeFile    string
+	DefaultFunctionName    string
+	DefaultPriority        int32
+	PriorityMin            int32
+	PriorityMax            int32
+	ProgramNamePrefix      string
+	ValidBytecodeNameRegex string
+	CsiDriverName          string
+	CsiMapPodPath          string
+	CsiMapName             string
 }
 
 type handshake struct {
@@ -354,6 +387,20 @@ func init() {
 		PinMapBaseDir: pinMapBaseDir,
 		BpfMapPodPath: bpfMapPodPath,
 		Xsk_map:       xsk_map,
+	}
+
+	Bpfman = bpfmanConf{
+		SocketPath:             bpfmanSocketPath,
+		DefaultBytecodeFile:    bpfmanDefaultBytecodeFile,
+		DefaultFunctionName:    bpfmanDefaultFunctionName,
+		DefaultPriority:        bpfmanDefaultPriority,
+		PriorityMin:            bpfmanPriorityMin,
+		PriorityMax:            bpfmanPriorityMax,
+		ProgramNamePrefix:      bpfmanProgramNamePrefix,
+		ValidBytecodeNameRegex: bpfmanValidNameRegex,
+		CsiDriverName:          bpfmanCsiDriverName,
+		CsiMapPodPath:          bpfmanCsiMapPodPath,
+		CsiMapName:             bpfmanCsiMapName,
 	}
 
 	EthtoolFilter = ethtoolFilter{

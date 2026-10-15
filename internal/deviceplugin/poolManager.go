@@ -17,6 +17,7 @@
 package deviceplugin
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -26,12 +27,12 @@ import (
 
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpfman"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncerserver"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/udsserver"
 	logging "github.com/sirupsen/logrus"
-	"context"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,6 +66,14 @@ type PoolManager struct {
 	DpCniSyncerSocket   string
 	SyncerActive        bool
 	Pbm                 bpf.PoolBpfMapManager
+	BpfmanEnable        bool
+	BpfmanBytecodeFile  string
+	BpfmanBytecodeImage string
+	BpfmanFunction      string
+	BpfmanPriority      int32
+	BpfmanSocket        string
+	BpfmanHandler       bpfman.Handler
+	bpfmanPrograms      map[string]uint32
 }
 
 func NewPoolManager(config PoolConfig) PoolManager {
@@ -83,6 +92,13 @@ func NewPoolManager(config PoolConfig) PoolManager {
 		UID:                 strconv.Itoa(config.UID),
 		EthtoolFilters:      config.EthtoolCmds,
 		DpCniSyncerServer:   config.DPCNIServer,
+		BpfmanEnable:        config.BpfmanEnable,
+		BpfmanBytecodeFile:  config.BpfmanBytecodeFile,
+		BpfmanBytecodeImage: config.BpfmanBytecodeImage,
+		BpfmanFunction:      config.BpfmanFunction,
+		BpfmanPriority:      config.BpfmanPriority,
+		BpfmanSocket:        config.BpfmanSocket,
+		bpfmanPrograms:      make(map[string]uint32),
 	}
 }
 
@@ -99,6 +115,15 @@ func (pm *PoolManager) Init(config PoolConfig) error {
 		return err
 	}
 	logging.Infof("Pool "+pm.DevicePrefix+"/%s started serving", pm.Name)
+
+	// Load and attach the pool's XDP programs via bpfman before the pool is
+	// registered with Kubelet, so no pod can be scheduled onto a device
+	// before its program (and pinned XSKMAP) exists.
+	if pm.BpfmanEnable {
+		if err := pm.initBpfman(); err != nil {
+			return err
+		}
+	}
 
 	if err := pm.registerWithKubelet(); err != nil {
 		return err
@@ -147,7 +172,152 @@ func (pm *PoolManager) Terminate() error {
 		}
 	}
 
+	if pm.BpfmanEnable {
+		pm.terminateBpfman()
+	}
+
 	return nil
+}
+
+/*
+initBpfman loads and attaches the pool's XDP program on every device in the
+pool via bpfman.
+
+Programs follow the pool lifecycle rather than the pod lifecycle: they are
+loaded before the pool is registered with Kubelet and unloaded when the pool
+terminates. This guarantees the pinned XSKMAP exists before any pod's CSI
+volume mount and that idle pooled devices simply pass traffic to the stack
+(the redirect program falls back to XDP_PASS when no AF_XDP socket is
+inserted into the map).
+*/
+func (pm *PoolManager) initBpfman() error {
+	ctx := context.Background()
+
+	if pm.BpfmanHandler == nil {
+		handler, err := bpfman.NewHandler(pm.BpfmanSocket)
+		if err != nil {
+			return err
+		}
+		pm.BpfmanHandler = handler
+	}
+
+	// In cdq mode the subfunctions must exist on the host before their XDP
+	// programs can be attached, so activate them eagerly rather than at
+	// Allocate time.
+	if pm.Mode == "cdq" {
+		for _, device := range pm.Devices {
+			if err := device.ActivateCdqSubfunction(); err != nil {
+				logging.Errorf("Error activating CDQ subfunction %s: %v", device.Name(), err)
+				return err
+			}
+		}
+	}
+
+	// Reconcile with programs left behind from a previous run: adopt
+	// programs whose device is still in this pool, unload the rest.
+	programs, err := pm.BpfmanHandler.ListXDPPrograms(ctx, map[string]string{
+		bpfman.MetadataKeyOwner: bpfman.OwnerValue,
+		bpfman.MetadataKeyPool:  pm.Name,
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, program := range programs {
+		device := program.Metadata[bpfman.MetadataKeyDevice]
+		if _, ok := pm.Devices[device]; ok {
+			logging.Infof("Adopting existing bpfman program %d for device %s", program.ID, device)
+			pm.bpfmanPrograms[device] = program.ID
+		} else {
+			logging.Infof("Unloading orphaned bpfman program %d for device %s", program.ID, device)
+			if err := pm.BpfmanHandler.Unload(ctx, program.ID); err != nil {
+				logging.Errorf("Error unloading orphaned bpfman program %d: %v", program.ID, err)
+			}
+		}
+	}
+
+	// Load and attach the program on every device that does not have one.
+	for deviceName := range pm.Devices {
+		if pm.bpfmanPrograms[deviceName] != 0 {
+			continue
+		}
+
+		logging.Infof("Loading bpfman XDP program on device: %s", deviceName)
+		program, err := pm.BpfmanHandler.LoadAndAttachXDP(ctx, pm.bpfmanLoadOptions(deviceName))
+		if err != nil {
+			logging.Errorf("Error loading bpfman XDP program on device %s: %v", deviceName, err)
+			return err
+		}
+		logging.Infof("bpfman XDP program loaded on: %s, program ID: %d, map pin path: %s",
+			deviceName, program.ID, program.MapPinPath)
+
+		pm.bpfmanPrograms[deviceName] = program.ID
+	}
+
+	return nil
+}
+
+/*
+terminateBpfman unloads all of the pool's bpfman programs and deactivates
+CDQ subfunctions that were eagerly activated for the pool.
+*/
+func (pm *PoolManager) terminateBpfman() {
+	ctx := context.Background()
+
+	for deviceName, id := range pm.bpfmanPrograms {
+		if err := pm.BpfmanHandler.Unload(ctx, id); err != nil {
+			logging.Errorf("Error unloading bpfman program %d for device %s: %v", id, deviceName, err)
+		} else {
+			logging.Infof("bpfman program %d unloaded from device %s", id, deviceName)
+		}
+	}
+
+	// In bpfman mode the CNI does not delete CDQ subfunctions at pod
+	// teardown, so clean them up here.
+	if pm.Mode == "cdq" {
+		for _, device := range pm.Devices {
+			if isSf, err := pm.NetHandler.IsCdqSubfunction(device.Name()); err != nil {
+				logging.Errorf("Error determining if %s is a CDQ subfunction: %v", device.Name(), err)
+			} else if isSf {
+				portIndex, err := pm.NetHandler.GetCdqPortIndex(device.Name())
+				if err != nil {
+					logging.Errorf("Error getting port index of device %s: %v", device.Name(), err)
+					continue
+				}
+				if err := pm.NetHandler.DeleteCdqSubfunction(portIndex); err != nil {
+					logging.Errorf("Error deleting CDQ subfunction %s: %v", device.Name(), err)
+				}
+			}
+		}
+	}
+
+	if pm.BpfmanHandler != nil {
+		if err := pm.BpfmanHandler.Close(); err != nil {
+			logging.Errorf("Error closing bpfman client: %v", err)
+		}
+	}
+}
+
+/*
+bpfmanLoadOptions builds the bpfman load options for a device in this pool.
+The program name is deterministic (afxdp-<pool>-<netdev>) so that pods can
+reference it in the csi.bpfman.io/program volume attribute.
+*/
+func (pm *PoolManager) bpfmanLoadOptions(deviceName string) bpfman.XDPLoadOptions {
+	programName := constants.Bpfman.ProgramNamePrefix + "-" + pm.Name + "-" + deviceName
+
+	return bpfman.XDPLoadOptions{
+		BytecodeFile:  pm.BpfmanBytecodeFile,
+		BytecodeImage: pm.BpfmanBytecodeImage,
+		FunctionName:  pm.BpfmanFunction,
+		ProgramName:   programName,
+		Iface:         deviceName,
+		Priority:      pm.BpfmanPriority,
+		ExtraMetadata: map[string]string{
+			bpfman.MetadataKeyPool:   pm.Name,
+			bpfman.MetadataKeyDevice: deviceName,
+		},
+	}
 }
 
 /*
@@ -189,7 +359,11 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 
 	logging.Debugf("New allocate request on pool %s", pm.Name)
 
-	if !pm.UdsServerDisable {
+	// In bpfman mode the XDP program and its pinned XSKMAP follow the pool
+	// lifecycle; there is no per-pod UDS server or map pinning.
+	udsEnabled := !pm.UdsServerDisable && !pm.BpfmanEnable
+
+	if udsEnabled {
 		logging.Infof("Creating new UDS server")
 		udsServer, udsPath, err = pm.ServerFactory.CreateServer(pm.DevicePrefix+"/"+pm.Name, pm.UID, pm.UdsTimeout, pm.UdsFuzz)
 		if err != nil {
@@ -211,7 +385,7 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 
 			containerSockPath := constants.Uds.PodPath + device.Name() + constants.Uds.SockName
 
-			if !pm.UdsServerDisable {
+			if udsEnabled {
 				cresp.Mounts = append(cresp.Mounts, &pluginapi.Mount{
 					HostPath:      udsPath,
 					ContainerPath: containerSockPath,
@@ -240,12 +414,18 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 			}
 
 			logging.Debugf("Cycling state of device %s", device.Name())
-			if err := device.Cycle(); err != nil {
-				logging.Errorf("Error cycling the state of device %s: %v", device.Name(), err)
-				continue
+			if !pm.BpfmanEnable {
+				// The link cycle is a workaround for XDP load errors (-22) seen
+				// when the plugin itself loads the program at Allocate time. In
+				// bpfman mode the program is already attached for the lifetime
+				// of the pool so the cycle is unnecessary.
+				if err := device.Cycle(); err != nil {
+					logging.Errorf("Error cycling the state of device %s: %v", device.Name(), err)
+					continue
+				}
 			}
 
-			if !pm.UdsServerDisable {
+			if udsEnabled {
 				logging.Infof("Loading BPF program on device: %s", device.Name())
 				fd, err := pm.BpfHandler.LoadBpfSendXskMap(device.Name())
 				if err != nil {
@@ -296,7 +476,7 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 		response.ContainerResponses = append(response.ContainerResponses, cresp)
 	}
 
-	if !pm.UdsServerDisable {
+	if udsEnabled {
 		udsServer.Start()
 	}
 

@@ -18,14 +18,17 @@ package deviceplugin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpfman"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/udsserver"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
@@ -251,4 +254,161 @@ func TestAllocate(t *testing.T) {
 
 		})
 	}
+}
+
+func TestAllocateBpfman(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	config := PoolConfig{
+		Name: "myPool",
+		Mode: "primary",
+		Devices: map[string]*networking.Device{
+			"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+			"dev_2": networking.CreateTestDevice("dev_2", "primary", "ice", "0000:81:00.2", "68:05:ca:2d:e9:02", netHandler),
+		},
+		UdsServerDisable:    false,
+		BpfMapPinningEnable: false,
+		BpfmanEnable:        true,
+		BpfmanBytecodeFile:  "/afxdp/xdp_afxdp_redirect_bpfman.o",
+		BpfmanFunction:      "xdp_afxdp_redirect",
+		BpfmanPriority:      10,
+		UID:                 1500,
+	}
+
+	pm := NewPoolManager(config)
+	pm.BpfmanHandler = bpfman.NewFakeHandler()
+
+	envVar := constants.Devices.EnvVarList + strings.ToUpper(pm.Name)
+
+	allocateRequest := &pluginapi.AllocateRequest{
+		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
+			{DevicesIDs: []string{"dev_1"}},
+		},
+	}
+
+	response, err := pm.Allocate(context.Background(), allocateRequest)
+	require.NoError(t, err)
+	require.Len(t, response.ContainerResponses, 1)
+
+	cresp := response.ContainerResponses[0]
+	assert.Equal(t, map[string]string{envVar: "dev_1"}, cresp.Envs)
+	assert.Empty(t, cresp.Mounts, "bpfman mode should not mount UDS sockets or pinned maps")
+
+	// the fake bpfman handler should not be used during Allocate; programs
+	// follow the pool lifecycle, not the pod lifecycle
+	fake := pm.BpfmanHandler.(*bpfman.FakeHandler)
+	assert.Empty(t, fake.Programs, "Allocate should not load bpfman programs")
+}
+
+func TestInitBpfman(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	newConfig := func() PoolConfig {
+		return PoolConfig{
+			Name: "myPool",
+			Mode: "primary",
+			Devices: map[string]*networking.Device{
+				"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+				"dev_2": networking.CreateTestDevice("dev_2", "primary", "ice", "0000:81:00.2", "68:05:ca:2d:e9:02", netHandler),
+			},
+			BpfmanEnable:       true,
+			BpfmanBytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			BpfmanFunction:     "xdp_afxdp_redirect",
+			BpfmanPriority:     10,
+		}
+	}
+
+	t.Run("loads a program per device", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		pm.BpfmanHandler = bpfman.NewFakeHandler()
+
+		require.NoError(t, pm.initBpfman())
+
+		fake := pm.BpfmanHandler.(*bpfman.FakeHandler)
+		assert.Len(t, fake.Programs, 2)
+		for devName, id := range pm.bpfmanPrograms {
+			assert.NotZero(t, id)
+			opts := fake.Programs[id]
+			require.NotNil(t, opts)
+			assert.Equal(t, devName, opts.Iface)
+			assert.Equal(t, "afxdp-myPool-"+devName, opts.ProgramName)
+			assert.Equal(t, int32(10), opts.Priority)
+			assert.Equal(t, "myPool", opts.ExtraMetadata[bpfman.MetadataKeyPool])
+			assert.Equal(t, devName, opts.ExtraMetadata[bpfman.MetadataKeyDevice])
+		}
+	})
+
+	t.Run("load error fails pool init", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+		fake.LoadError = errors.New("bpfman unavailable")
+		pm.BpfmanHandler = fake
+
+		err := pm.initBpfman()
+		require.Error(t, err)
+	})
+
+	t.Run("adopts existing programs and unloads orphans", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+
+		// program for dev_1 left over from a previous run
+		existing, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_1",
+			Iface:         "dev_1",
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
+		})
+		require.NoError(t, err)
+
+		// orphaned program for a device no longer in the pool
+		orphan, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_gone",
+			Iface:         "dev_gone",
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_gone"},
+		})
+		require.NoError(t, err)
+
+		pm.BpfmanHandler = fake
+		require.NoError(t, pm.initBpfman())
+
+		assert.Equal(t, existing.ID, pm.bpfmanPrograms["dev_1"], "existing program should be adopted")
+		require.Contains(t, pm.bpfmanPrograms, "dev_2", "missing program should be loaded")
+
+		_, stillLoaded := fake.Programs[orphan.ID]
+		assert.False(t, stillLoaded, "orphaned program should be unloaded")
+
+		assert.Len(t, fake.Programs, 2)
+	})
+}
+
+func TestTerminateBpfman(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	config := PoolConfig{
+		Name: "myPool",
+		Mode: "primary",
+		Devices: map[string]*networking.Device{
+			"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+		},
+		BpfmanEnable:       true,
+		BpfmanBytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+		BpfmanFunction:     "xdp_afxdp_redirect",
+		BpfmanPriority:     10,
+	}
+
+	pm := NewPoolManager(config)
+	fake := bpfman.NewFakeHandler()
+	pm.BpfmanHandler = fake
+
+	require.NoError(t, pm.initBpfman())
+	require.Len(t, fake.Programs, 1)
+
+	require.NoError(t, pm.Terminate())
+
+	assert.Empty(t, fake.Programs, "pool programs should be unloaded on terminate")
+	assert.True(t, fake.Closed, "bpfman client should be closed on terminate")
 }

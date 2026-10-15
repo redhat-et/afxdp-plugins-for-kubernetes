@@ -54,6 +54,7 @@ type NetConfig struct {
 	LogLevel      string   `json:"logLevel,omitempty"`
 	EthtoolCmds   []string `json:"ethtoolCmds,omitempty"`
 	DPSyncer      bool     `json:"dpSyncer,omitempty"`
+	Bpfman        bool     `json:"bpfman,omitempty"`
 }
 
 func init() {
@@ -346,7 +347,7 @@ func CmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	if !cfg.SkipUnloadBpf {
+	if !cfg.SkipUnloadBpf && !cfg.Bpfman {
 		logging.Infof("cmdDel(): removing BPF program from device")
 		if err := bpfHandler.Cleanbpf(cfg.Device); err != nil {
 			err = fmt.Errorf("cmdDel(): error removing BPF program from device: %w", err)
@@ -354,6 +355,13 @@ func CmdDel(args *skel.CmdArgs) error {
 
 			return err
 		}
+	}
+
+	if cfg.Bpfman {
+		// In bpfman mode the XDP program follows the pool lifecycle and is
+		// managed by the device plugin via bpfman, so the program is left
+		// attached when the device returns to the host namespace.
+		logging.Infof("cmdDel(): bpfman mode, leaving the XDP program on device %s to the device plugin", cfg.Device)
 	}
 	if cfg.Mode == "primary" {
 		if cfg.EthtoolCmds != nil {
@@ -373,7 +381,10 @@ func CmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	if cfg.Mode == "cdq" {
+	// In bpfman mode CDQ subfunctions are eagerly created for the pool and
+	// deleted by the device plugin when the pool terminates, so they are
+	// left in place at pod teardown.
+	if cfg.Mode == "cdq" && !cfg.Bpfman {
 		isSf, err := netHandler.IsCdqSubfunction(cfg.Device)
 		if err != nil {
 			logging.Errorf("cmdDel(): error determining if %s is a CDQ subfunction: %v", cfg.Device, err)

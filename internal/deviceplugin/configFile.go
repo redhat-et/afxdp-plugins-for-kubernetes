@@ -17,6 +17,7 @@
 package deviceplugin
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -56,6 +57,13 @@ const (
 	poolModeRequiredError = "Plugin must have a mode"
 	poolModeMustBeError   = "Plugin mode must be one of "
 
+	// bpfman errors
+	bpfmanPinningConflictError = "BpfMapPinningEnable and BpfmanEnable cannot be used together"
+	bpfmanBytecodeConflictErr  = "Only one of BpfmanBytecodeFile or BpfmanBytecodeImage can be set"
+	bpfmanBytecodeValidErr     = "Bpfman bytecode file and image must be a valid path or URL"
+	bpfmanPriorityError        = "BpfmanPriority must be between 1 and 10000"
+	bpfmanSocketValidError     = "bpfmanSocket must be a valid absolute unix socket path"
+
 	// logging errors
 	filenameValidError = "must be a valid .log or .txt filename"
 )
@@ -93,13 +101,19 @@ type configFile_Pool struct {
 	UdsFuzz                 bool                 `json:"UdsFuzz"`
 	RequiresUnprivilegedBpf bool                 `json:"RequiresUnprivilegedBpf"`
 	UID                     int                  `json:"uid"`
+	BpfmanEnable            bool                 `json:"BpfmanEnable"`
+	BpfmanBytecodeFile      string               `json:"BpfmanBytecodeFile,omitempty"`
+	BpfmanBytecodeImage     string               `json:"BpfmanBytecodeImage,omitempty"`
+	BpfmanFunction          string               `json:"BpfmanFunction,omitempty"`
+	BpfmanPriority          int32                `json:"BpfmanPriority,omitempty"`
 }
 
 type configFile struct {
-	Pools       []*configFile_Pool `json:"Pools"`
-	LogFile     string             `json:"LogFile"`
-	LogLevel    string             `json:"LogLevel"`
-	KindCluster bool               `json:"kindCluster"`
+	Pools        []*configFile_Pool `json:"Pools"`
+	LogFile      string             `json:"LogFile"`
+	LogLevel     string             `json:"LogLevel"`
+	KindCluster  bool               `json:"kindCluster"`
+	BpfmanSocket string             `json:"bpfmanSocket,omitempty"`
 }
 
 func (c configFile_Device) Validate() error {
@@ -190,7 +204,7 @@ func (c configFile_Pool) Validate() error {
 		iModes[i] = mode
 	}
 
-	return validation.ValidateStruct(&c,
+	err := validation.ValidateStruct(&c,
 		validation.Field(
 			&c.Name,
 			validation.Required.Error(poolNameRequiredError),
@@ -227,7 +241,34 @@ func (c configFile_Pool) Validate() error {
 			validation.When(!(c.UID == 0), validation.Max(constants.UID.Maximum)),
 			validation.When(!(c.UID == 0), validation.Min(constants.UID.Minimum)),
 		),
+		validation.Field(
+			&c.BpfmanBytecodeFile,
+			validation.When(c.BpfmanEnable,
+				validation.Match(regexp.MustCompile(constants.Bpfman.ValidBytecodeNameRegex)).Error(bpfmanBytecodeValidErr),
+			).Else(validation.Empty.Error(bpfmanBytecodeValidErr)),
+			validation.When(len(c.BpfmanBytecodeImage) > 0, validation.Empty.Error(bpfmanBytecodeConflictErr)),
+		),
+		validation.Field(
+			&c.BpfmanBytecodeImage,
+			validation.When(c.BpfmanEnable,
+				validation.Match(regexp.MustCompile(constants.Bpfman.ValidBytecodeNameRegex)).Error(bpfmanBytecodeValidErr),
+			).Else(validation.Empty.Error(bpfmanBytecodeValidErr)),
+		),
+		validation.Field(
+			&c.BpfmanPriority,
+			validation.When(c.BpfmanPriority != 0,
+				validation.Min(int(constants.Bpfman.PriorityMin)).Error(bpfmanPriorityError),
+				validation.Max(int(constants.Bpfman.PriorityMax)).Error(bpfmanPriorityError),
+			),
+		),
 	)
+	if err != nil {
+		return err
+	}
+	if c.BpfmanEnable && c.BpfMapPinningEnable {
+		return errors.New(bpfmanPinningConflictError)
+	}
+	return nil
 }
 
 func (c configFile) Validate() error {
@@ -252,6 +293,10 @@ func (c configFile) Validate() error {
 		validation.Field(
 			&c.LogLevel,
 			validation.In(iLogLevels...).Error("must be "+fmt.Sprintf("%v", iLogLevels)),
+		),
+		validation.Field(
+			&c.BpfmanSocket,
+			validation.Match(regexp.MustCompile(`^/[a-zA-Z0-9_/.-]+$`)).Error(bpfmanSocketValidError),
 		),
 	)
 }

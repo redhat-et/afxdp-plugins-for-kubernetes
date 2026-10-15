@@ -44,9 +44,10 @@ PluginConfig is the object that represents the overall plugin config.
 Global configurations such as log levels are contained here.
 */
 type PluginConfig struct {
-	LogFile     string
-	LogLevel    string
-	KindCluster bool
+	LogFile      string
+	LogLevel     string
+	KindCluster  bool
+	BpfmanSocket string // path to the bpfman gRPC unix socket, used by pools with bpfman enabled
 }
 
 /*
@@ -66,6 +67,12 @@ type PoolConfig struct {
 	UID                     int                             // the id of the pod user, we give this user ACL access to the UDS socket
 	EthtoolCmds             []string                        // list of ethtool filters to apply to the netdev
 	DPCNIServer             *dpcnisyncerserver.SyncerServer // grpc syncer between DP and CNI
+	BpfmanEnable            bool                            // a boolean to say this pool uses bpfman for XDP program load/attach instead of the device plugin's own BPF loading
+	BpfmanBytecodeFile      string                          // local path to the XDP bytecode loaded via bpfman, defaults to the redirect program shipped with the DP
+	BpfmanBytecodeImage     string                          // OCI image URL of the XDP bytecode loaded via bpfman, takes precedence over BpfmanBytecodeFile
+	BpfmanFunction          string                          // XDP function name within the bytecode object, defaults to xdp_afxdp_redirect
+	BpfmanPriority          int32                           // XDP priority used when attaching via bpfman, lower runs earlier
+	BpfmanSocket            string                          // path to the bpfman gRPC unix socket
 }
 
 /*
@@ -83,9 +90,10 @@ func GetPluginConfig(configFile string) (PluginConfig, error) {
 	}
 
 	pluginConfig = PluginConfig{
-		LogFile:     cfgFile.LogFile,
-		LogLevel:    cfgFile.LogLevel,
-		KindCluster: cfgFile.KindCluster,
+		LogFile:      cfgFile.LogFile,
+		LogLevel:     cfgFile.LogLevel,
+		KindCluster:  cfgFile.KindCluster,
+		BpfmanSocket: cfgFile.BpfmanSocket,
 	}
 
 	return pluginConfig, nil
@@ -250,6 +258,30 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 			what is returned is a map of fully functional device objects from the networking package
 			our devices become "real" at this point
 		*/
+		// bpfman defaults - socket, bytecode, function and priority
+		if pool.BpfmanEnable {
+			if pool.BpfmanPriority == 0 {
+				pool.BpfmanPriority = constants.Bpfman.DefaultPriority
+				logging.Debugf("Using default bpfman XDP priority: %d", pool.BpfmanPriority)
+			}
+			if pool.BpfmanFunction == "" {
+				pool.BpfmanFunction = constants.Bpfman.DefaultFunctionName
+				logging.Debugf("Using default bpfman XDP function: %s", pool.BpfmanFunction)
+			}
+			if pool.BpfmanBytecodeFile == "" && pool.BpfmanBytecodeImage == "" {
+				pool.BpfmanBytecodeFile = constants.Bpfman.DefaultBytecodeFile
+				logging.Debugf("Using default bpfman bytecode: %s", pool.BpfmanBytecodeFile)
+			}
+			if pool.BpfmanBytecodeImage != "" {
+				pool.BpfmanBytecodeFile = ""
+			}
+		}
+
+		bpfmanSocket := cfgFile.BpfmanSocket
+		if bpfmanSocket == "" {
+			bpfmanSocket = constants.Bpfman.SocketPath
+		}
+
 		devices := getSecondaryDevices(pool)
 
 		if len(devices) != 0 {
@@ -264,6 +296,12 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 				RequiresUnprivilegedBpf: pool.RequiresUnprivilegedBpf,
 				UID:                     pool.UID,
 				DPCNIServer:             dpcniserver,
+				BpfmanEnable:            pool.BpfmanEnable,
+				BpfmanBytecodeFile:      pool.BpfmanBytecodeFile,
+				BpfmanBytecodeImage:     pool.BpfmanBytecodeImage,
+				BpfmanFunction:          pool.BpfmanFunction,
+				BpfmanPriority:          pool.BpfmanPriority,
+				BpfmanSocket:            bpfmanSocket,
 			})
 		}
 	}
