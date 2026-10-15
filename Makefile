@@ -131,6 +131,14 @@ e2efulldaemon: image
 	@echo
 	@echo
 
+.PHONY: e2ebpfman
+e2ebpfman: image ## Run the bpfman mode e2e test (requires a kind cluster with multus and bpfman, see test/e2e/README.md)
+	@echo "******  bpfman Mode E2E ******"
+	@echo
+	cd test/e2e/ && ./bpfman-e2e-test.sh
+	@echo
+	@echo
+
 # static-ci: consists of static analysis tools required for the public CI
 # repository workflow /.github/workflows/public-ci.yml
 # Note: the public repository CI comprises of further static analysis tools via the

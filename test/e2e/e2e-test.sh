@@ -48,7 +48,7 @@ cleanup() {
 	kubectl delete pod --grace-period=0 --ignore-not-found=true afxdp-e2e-test &> /dev/null
 	kubectl delete pods -l app=afxdp-e2e -n default --grace-period=0 --ignore-not-found=true &> /dev/null
 	echo "Delete Test App"
-	rm -f ./udsTest &> /dev/null
+	rm -f ./udsTest ./bpfmanTest &> /dev/null
 	echo "Delete CNI"
 	rm -f /opt/cni/bin/afxdp &> /dev/null
 	echo "Delete Network Attachment Definition"
@@ -78,6 +78,7 @@ build() {
 	kubectl create -f $workdir/nad.yaml
 	echo "***** Test App *****"
 	go build -tags netgo -o udsTest ./udsTest.go
+	go build -tags netgo -o bpfmanTest ./bpfman/
 	echo "***** Docker Image *****"
 	$container_tool build -t afxdp-e2e-test -f Dockerfile .
 }

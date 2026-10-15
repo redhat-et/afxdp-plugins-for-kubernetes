@@ -1,0 +1,55 @@
+# WARNING: This is an example pod spec only. Remove all comments before use.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: afxdp-pod-bpfman                       # Pod name
+  annotations:
+    k8s.v1.cni.cncf.io/networks: afxdp-network-bpfman # Network to attach to (see network-attachment-definition-bpfman.yaml)
+spec:
+  securityContext:
+    runAsNonRoot: true                         # AF_XDP pods can run unprivileged on kernels >= 5.19
+    fsGroup: 65534                             # The bpfman CSI driver gives the fsGroup access to the exposed maps
+  containers:
+  - name: afxdp
+    image: docker-image:latest                 # Specify your docker image here, along with PullPolicy and command
+    imagePullPolicy: IfNotPresent
+    command: ["tail", "-f", "/dev/null"]
+    securityContext:
+      capabilities:
+        add:
+          - NET_RAW                            # Required to create AF_XDP (packet) sockets
+          - IPC_LOCK                           # Required when locking UMEM memory
+    resources:
+      requests:
+        afxdp/myPool: '1'                      # The resource requested needs to match the device plugin pool name / resource type
+      limits:                                  # The number requested needs to match the amount requested in annotations list above
+        afxdp/myPool: '1'                      # Requests and limits should match
+    volumeMounts:
+      - name: afxdp-maps
+        mountPath: /run/xdp/maps               # The XSKMAPs appear under this path, one subdirectory per netdev
+        readOnly: false
+  volumes:
+    # The bpfman CSI driver exposes the XSKMAP of each netdev in the pool
+    # under /run/xdp/maps/<netdev>/xsks_map. The application learns its
+    # netdev(s) from the AFXDP_DEVICES_<pool> environment variable and opens
+    # the corresponding map, e.g. /run/xdp/maps/ens801f0/xsks_map.
+    # DPDK: use "use_pinned_map=1,dp_path=/run/xdp/maps/<netdev>/xsks_map".
+    - name: afxdp-maps
+      csi:
+        driver: csi.bpfman.io
+        volumeAttributes:
+          csi.bpfman.io/programs-by-metadata: afxdp.io/pool=myPool
+          csi.bpfman.io/subpath-metadata: afxdp.io/device
+          csi.bpfman.io/maps: xsks_map
+  restartPolicy: Never
+
+# NOTE: For a pool with a single, well-known device you can instead request
+# the program directly, which exposes the XSKMAP at /run/xdp/maps/xsks_map:
+#
+#    - name: afxdp-maps
+#      csi:
+#        driver: csi.bpfman.io
+#        volumeAttributes:
+#          csi.bpfman.io/program: afxdp-myPool-ens801f0
+#          csi.bpfman.io/maps: xsks_map

@@ -1,0 +1,30 @@
+# WARNING: This is an example definition only. Remove all comments before use.
+
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: afxdp-network-bpfman                                                                    # Name of this network, pods will request this network by name
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: afxdp/myPool                                               # Needs to match the device plugin pool name / resource type. Multus uses
+                                                                                                 # it to inject the allocated device name into this CNI config at runtime.
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "type": "afxdp",                                                                   # CNI binary, leave as afxdp
+      "mode": "primary",                                                                 # CNI mode setting (required)
+      "bpfman": true,                                                                    # bpfman mode (recommended): the XDP program is managed by bpfman via the
+                                                                                         # device plugin and is NOT unloaded when the pod is terminated
+      "logFile": "afxdp-cni.log",                                                        # CNI log file location (optional)
+      "logLevel": "debug",                                                               # CNI logging level (optional)
+
+      "ipam": {                                                                          # CNI IPAM plugin and associated config (optional)
+        "type": "host-local",
+        "subnet": "192.168.1.0/24",
+        "rangeStart": "192.168.1.200",
+        "rangeEnd": "192.168.1.220",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.1.1"
+      }
+    }'

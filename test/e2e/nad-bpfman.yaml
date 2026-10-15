@@ -1,0 +1,25 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: afxdp-e2e-bpfman
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: afxdp/myPool
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "type": "afxdp",
+      "mode": "primary",
+      "bpfman": true,
+      "logFile": "afxdp-cni-bpfman-e2e.log",
+      "logLevel": "debug",
+      "ipam": {
+        "type": "host-local",
+        "subnet": "192.168.2.0/24",
+        "rangeStart": "192.168.2.200",
+        "rangeEnd": "192.168.2.216",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.2.1"
+      }
+    }'

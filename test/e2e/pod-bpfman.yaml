@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: afxdp-e2e-bpfman-test
+  annotations:
+    k8s.v1.cni.cncf.io/networks: afxdp-e2e-bpfman
+spec:
+  # Unprivileged pod: bpfman mode requires no BPF capabilities on
+  # kernels >= 5.19. The fsGroup gives the CSI driver a group to own
+  # the exposed maps.
+  securityContext:
+    runAsUser: 1500
+    runAsGroup: 1500
+    fsGroup: 1500
+  containers:
+  - name: afxdp
+    image: afxdp-e2e-test:latest
+    imagePullPolicy: Never
+    command: ["/bin/sh", "-c"]
+    args: ["bpfmanTest &> /tmp/bpfmanTest.txt; tail -f /dev/null"]
+    resources:
+      requests:
+        afxdp/myPool: '1'
+      limits:
+        afxdp/myPool: '1'
+    volumeMounts:
+      - name: afxdp-maps
+        mountPath: /run/xdp/maps
+        readOnly: false
+  volumes:
+    - name: afxdp-maps
+      csi:
+        driver: csi.bpfman.io
+        volumeAttributes:
+          csi.bpfman.io/programs-by-metadata: afxdp.io/pool=myPool
+          csi.bpfman.io/subpath-metadata: afxdp.io/device
+          csi.bpfman.io/maps: xsks_map
+  restartPolicy: Never
