@@ -11,23 +11,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LLC ?= llc
 CLANG ?= clang
 
-all: afxdp_redirect
+# Number of queue entries in the XSKMAP, override for NICs with more queues.
+XSK_MAP_MAX_ENTRIES ?= 64
 
-afxdp_redirect:
-	$(CLANG) -S \
+# Linux UAPI headers (asm/types.h & friends) live in the multiarch include
+# directory; -target bpf drops it from clang's default search path.
+ARCH_INCLUDES := $(wildcard /usr/include/x86_64-linux-gnu /usr/include/aarch64-linux-gnu /usr/include/s390x-linux-gnu /usr/include/powerpc64le-linux-gnu)
+
+# Single-step BTF-aware build. BTF (-g) is required for libxdp/bpfman
+# dispatcher (freplace) based attachment and for CO-RE relocations.
+CLANG_FLAGS = \
 	-target bpf \
 	-D __BPF_TRACING__ \
 	-I/usr/include/bpf \
+	$(addprefix -I,$(ARCH_INCLUDES)) \
 	-Wall \
 	-Wno-unused-value \
 	-Wno-pointer-sign \
 	-Wno-compare-distinct-pointer-types \
 	-Werror \
-	-O2 -emit-llvm -g -o xdp_afxdp_redirect.ll xdp_afxdp_redirect.c
-	$(LLC) -march=bpf -filetype=obj -o xdp_afxdp_redirect.o xdp_afxdp_redirect.ll
+	-O2 -g
+
+all: xdp_afxdp_redirect.o xdp_afxdp_redirect_bpfman.o
+
+# Legacy build used with xdp-loader in BPF map pinning mode: the XSKMAP is
+# pinned by name (LIBBPF_PIN_BY_NAME) into the pin path passed to xdp-loader.
+xdp_afxdp_redirect.o: xdp_afxdp_redirect.c
+	$(CLANG) $(CLANG_FLAGS) -DXSK_MAP_MAX_ENTRIES=$(XSK_MAP_MAX_ENTRIES) -c -o $@ $<
+
+# bpfman build used when the device plugin loads the program via bpfman: the
+# XSKMAP is not pinned by name so each program gets its own map, pinned by
+# bpfman under the program's map directory.
+xdp_afxdp_redirect_bpfman.o: xdp_afxdp_redirect.c
+	$(CLANG) $(CLANG_FLAGS) -DBPFMAN -DXSK_MAP_MAX_ENTRIES=$(XSK_MAP_MAX_ENTRIES) -c -o $@ $<
 
 clean:
-	rm -f *.o xdp_afxdp_redirect.ll
+	rm -f *.o
