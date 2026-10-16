@@ -1,9 +1,10 @@
 # Testing the AF_XDP Device Plugin and CNI
 
 This document describes the environments in which the plugins can be tested and what
-should be tested in each. Three tiers are covered: unit tests (no cluster), functional
-testing on [Kind](#kind-functional), and realistic testing on
-[hardware or VMs](#bare-metal-or-vm-realistic). The design of the bpfman mode under test
+should be tested in each. Four tiers are covered: unit tests (no cluster), functional
+testing on [Kind](#kind-functional), [cloud instances and VMs](#cloud-instances-and-vms-virtual-nics)
+(virtual NICs, copy or zero-copy depending on the driver), and realistic testing on
+[hardware](#bare-metal-or-vm-realistic). The design of the bpfman mode under test
 is described in [bpfman-integration.md](./bpfman-integration.md).
 
 ## Unit tests (development machine or CI, Linux)
@@ -49,10 +50,79 @@ What to test on kind:
   appear at `/run/xdp/maps/<netdev>/xsks_map` in the pod and that DP restarts
   re-adopt (not duplicate) the bpfman programs
 
+## Cloud instances and VMs (virtual NICs)
+
+Not everyone has access to physical AF_XDP-capable NICs. The support matrix below
+was verified against the kernel sources; use `xdp-loader features <iface>` on the
+instance to confirm (look for `XSK_ZEROCOPY` in the features list).
+
+| Platform | Driver | AF_XDP mode | Since | Notes |
+| --- | --- | --- | --- | --- |
+| kind / containers | `veth` | copy | - | full control plane, no data path fidelity |
+| AWS EC2 (Elastic Network Adapter) | `ena` | copy | - | ena has native XDP but no XSK support (verified through mainline v7.x); functional testing only |
+| Local VM (QEMU/libvirt/KVM) | `virtio_net` | **zero-copy** (kernel >= 6.11), copy on older | v6.11 | best no-hardware zero-copy option; needs a >= 6.11 guest kernel |
+| GCP (gVNIC) | `gve` | **zero-copy** (GQI-QPL format, kernel >= 6.4), copy on older | v6.4 | |
+| Azure (accelerated networking) | `mlx5_core` | **zero-copy** | long-standing | mlx5 also supports devlink subfunctions, but the plugin's CDQ mode currently gates on the `ice` driver |
+| Bare metal Intel | `i40e`, `ice`, `E810` | **zero-copy** | long-standing | full CDQ support on `ice` |
+
+What virtual NICs cover:
+
+- All control plane behavior: pool discovery, allocation, UDS handshake, bpfman
+  load/attach/reconcile, CSI map exposure, unprivileged pod access, CNI add/del,
+  pod churn, DPDK `use_cni`/`use_pinned_map` flows
+- Data path in copy mode (including DPDK testpmd without `xdp_zerocopy=1`)
+
+What they do not cover (needs zero-copy hardware): zero-copy performance,
+`NETDEV_XDP_ACT_XSK_ZEROCOPY` verification, CDQ subfunction scaling (`ice` only),
+hardware ethtool filters.
+
+### AWS example
+
+Any ENA instance works for functional testing (e.g. `c5n.2xlarge`/`m5n.2xlarge`
+with 4+ queues). Use a distribution with kernel >= 5.19 so pods can open the
+exposed maps without `CAP_BPF` (Ubuntu 24.04's 6.8 is a good fit; Amazon Linux
+2023's 5.10 works for the plugins themselves but pods need `CAP_BPF` for map
+access). The instance's primary interface is typically `ens5` (or `eth0` for the
+first ENI) - both can be pooled after excluding them from the cluster's default
+network; the prohibited-prefix list in `constants.Devices.Prohibited` does not
+block `ens5`.
+
+```sh
+# on the instance: confirm the NIC and its XDP features
+ethtool -i ens5 | grep driver        # -> ena
+xdp-loader features ens5             # native XDP; no XSK_ZEROCOPY -> copy mode
+```
+
+Pool config for the device plugin:
+
+```json
+{
+  "pools": [
+    {
+      "name": "myPool",
+      "mode": "primary",
+      "BpfmanEnable": true,
+      "drivers": [ { "name": "ena" } ]
+    }
+  ]
+}
+```
+
+### Local VM example (zero-copy without hardware)
+
+A libvirt/QEMU VM with virtio NICs on a >= 6.11 kernel supports zero-copy
+AF_XDP:
+
+```sh
+ethtool -i ens3 | grep driver        # -> virtio_net
+xdp-loader features ens3             # XSK_ZEROCOPY present on >= 6.11
+```
+
 ## Bare metal or VM (realistic)
 
-For data path fidelity use a node with an Intel NIC supported for zero-copy AF_XDP
-(`i40e`, `ice`/E810 -- see `constants.Drivers.ZeroCopy`). A single node is enough;
+For data path fidelity use a node with a NIC supporting zero-copy AF_XDP
+(`i40e`, `ice`/E810, or the virtual options in the table above - `virtio_net` >= 6.11,
+`gve` >= 6.4, `mlx5_core`). A single node is enough;
 install Kubernetes + multus + a default CNI, then `make deploy`.
 
 Recommended setup:

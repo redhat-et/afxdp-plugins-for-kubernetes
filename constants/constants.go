@@ -49,13 +49,13 @@ var (
 	deviceSecondaryMax   = 64                                                       // maximum number of secondary devices that can be created on top of a primary device
 
 	/* Drivers */
-	driversZeroCopy      = []string{"i40e", "E810", "ice", "veth"} // drivers that support zero copy AF_XDP
-	driversCdq           = []string{"ice"}                         // drivers that support CDQ subfunctions
-	driverValidNameRegex = `^[a-zA-Z0-9_-]+$`                      // regex to check if a string is a valid driver name
-	driverValidNameMin   = 1                                       // minimum length of a driver name
-	driverValidNameMax   = 50                                      // maximum length of a deiver name
-	driverPrimaryMin     = 1                                       // minimum number of primary devices a driver can take from a node
-	driverPrimaryMax     = 10                                      // maximum number of primary devices a driver can take from a node
+	driversZeroCopy      = []string{"i40e", "E810", "ice", "mlx5_core", "veth"} // drivers validated for AF_XDP use; zero-copy requires driver XSK support - see docs/testing.md for the support matrix
+	driversCdq           = []string{"ice"}                                      // drivers that support CDQ subfunctions
+	driverValidNameRegex = `^[a-zA-Z0-9_-]+$`                                   // regex to check if a string is a valid driver name
+	driverValidNameMin   = 1                                                    // minimum length of a driver name
+	driverValidNameMax   = 50                                                   // maximum length of a deiver name
+	driverPrimaryMin     = 1                                                    // minimum number of primary devices a driver can take from a node
+	driverPrimaryMax     = 10                                                   // maximum number of primary devices a driver can take from a node
 
 	/* Nodes */
 	nodeValidHostRegex = `^[a-zA-Z0-9-]+$` // regex to check if a string is a valid node name
@@ -72,6 +72,9 @@ var (
 
 	/* AF_XDP */
 	afxdpMinimumLinux = "4.18.0" // minimum Linux version for AF_XDP support
+
+	/* bpfman */
+	bpfmanMinimumLinux = "5.6.0" // minimum Linux version for bpfman mode: XDP dispatcher (freplace) attachment
 
 	/* UDS*/
 	udsMaxTimeout = 300              // maximum configurable uds timeout in seconds
@@ -259,6 +262,7 @@ type bpfmanConf struct {
 	CsiDriverName          string
 	CsiMapPodPath          string
 	CsiMapName             string
+	MinumumKernel          string
 }
 
 type handshake struct {
@@ -401,6 +405,7 @@ func init() {
 		CsiDriverName:          bpfmanCsiDriverName,
 		CsiMapPodPath:          bpfmanCsiMapPodPath,
 		CsiMapName:             bpfmanCsiMapName,
+		MinumumKernel:          bpfmanMinimumLinux,
 	}
 
 	EthtoolFilter = ethtoolFilter{

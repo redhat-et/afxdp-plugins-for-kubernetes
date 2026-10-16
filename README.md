@@ -43,6 +43,9 @@ Requirements:
 - Kernel >= 5.6 for the XDP dispatcher (freplace) based attachment, >= 5.19 for
   unprivileged pod access to the exposed maps.
 - Kubernetes >= 1.26 for CSI ephemeral inline volumes.
+- On SELinux-enforcing distributions, make sure the device plugin container can
+  reach the bpfman socket (see bpfman's
+  [SELinux distributions guide](https://bpfman.io/main/developer-guide/k8s-selinux-distros/)).
 
 Deploy with [deployments/daemonset-bpfman.yaml](./deployments/daemonset-bpfman.yaml) and
 see [examples/network-attachment-definition-bpfman.yaml](./examples/network-attachment-definition-bpfman.yaml)
@@ -620,9 +623,10 @@ From the [examples/network-attachment-definition.yaml](./examples/network-attach
 
 ## Testing
 
-See [docs/testing.md](./docs/testing.md) for the test environments (unit, kind, bare
-metal/VM) and the test matrix covering the UDS, map pinning and bpfman modes, DPDK
-testpmd integration, CDQ subfunctions and busy polling.
+See [docs/testing.md](./docs/testing.md) for the test environments (unit, kind, cloud
+instances and VMs - including zero-copy AF_XDP on `virtio_net` >= 6.11, `gve` and
+`mlx5_core` - and bare metal) and the test matrix covering the UDS, map pinning and
+bpfman modes, DPDK testpmd integration, CDQ subfunctions and busy polling.
 
 ## CLOC
 

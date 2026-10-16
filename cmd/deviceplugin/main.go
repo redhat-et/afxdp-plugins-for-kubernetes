@@ -114,6 +114,35 @@ func main() {
 	}
 	logging.Infof("Found %d poolConfigs", len(poolConfigs))
 
+	// bpfman mode requires a kernel new enough for XDP dispatcher (freplace)
+	// based attachment
+	for _, poolConfig := range poolConfigs {
+		if !poolConfig.BpfmanEnable {
+			continue
+		}
+		linuxVersion, err := hostHandler.KernelVersion()
+		if err != nil {
+			logging.Errorf("Error checking kernel version for bpfman mode: %v", err)
+			exit(constants.Plugins.DevicePlugin.ExitHostError)
+		}
+		linuxInt, err := tools.KernelVersionInt(linuxVersion)
+		if err != nil {
+			logging.Errorf("Error converting kernel version %s to int: %v", linuxVersion, err)
+			exit(constants.Plugins.DevicePlugin.ExitHostError)
+		}
+		bpfmanMinInt, err := tools.KernelVersionInt(constants.Bpfman.MinumumKernel)
+		if err != nil {
+			logging.Errorf("Error converting bpfman minimum kernel version to int: %v", err)
+			exit(constants.Plugins.DevicePlugin.ExitHostError)
+		}
+		if linuxInt < bpfmanMinInt {
+			logging.Errorf("Pool %s uses bpfman mode, which requires kernel >= %s (host is running %s). Unprivileged pod access to the exposed maps additionally requires kernel >= 5.19",
+				poolConfig.Name, constants.Bpfman.MinumumKernel, linuxVersion)
+			exit(constants.Plugins.DevicePlugin.ExitPoolError)
+		}
+		break
+	}
+
 	dp := devicePlugin{
 		pools: make(map[string]deviceplugin.PoolManager),
 	}
