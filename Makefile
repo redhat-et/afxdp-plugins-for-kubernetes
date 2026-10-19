@@ -81,6 +81,17 @@ image-builder-check:
 image: image-builder-check ## Build container image
 	 $(CTR_CMD) build -t afxdp-device-plugin -f images/amd64.dockerfile .
 
+BYTECODE_IMAGE ?= quay.io/afxdp-plugins-for-kubernetes/xdp-afxdp-redirect
+BYTECODE_TAG ?= latest
+
+.PHONY: bytecode-image
+bytecode-image: image-builder-check buildxdp ## Build the XDP redirect bytecode OCI image (bpfman-compatible)
+	$(CTR_CMD) build --platform linux/amd64 -t $(BYTECODE_IMAGE):$(BYTECODE_TAG) -f images/bytecode-redirect.dockerfile .
+
+.PHONY: bytecode-push
+bytecode-push: bytecode-image ## Build and push the XDP redirect bytecode OCI image
+	$(CTR_CMD) push $(BYTECODE_IMAGE):$(BYTECODE_TAG)
+
 ##@ Deployment - assumes K8s environment is already setup
 undeploy: ## Undeploy the Deamonset
 	@echo "******  Stop Daemonset   ******"

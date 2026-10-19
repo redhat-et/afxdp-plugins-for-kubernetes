@@ -484,12 +484,32 @@ BpfMapPinningEnable. By default, this is set to false.
 
 #### BpfmanBytecodeFile / BpfmanBytecodeImage
 
-The XDP bytecode loaded via bpfman: either a path to a local `.o` file (default:
-`/afxdp/xdp_afxdp_redirect_bpfman.o`, shipped in the device plugin image) or the URL of an
-OCI bytecode image, following [bpfman's eBPF Bytecode Image Specification](https://bpfman.io/main/getting-started/shipping-bytecode/).
-Only one of the two may be set. The object must contain an XSKMAP named `xsks_map`. For
-NICs with more than 64 queues, rebuild the default program with
-`make XSK_MAP_MAX_ENTRIES=<queues>`.
+The XDP bytecode loaded via bpfman: either the URL of an OCI bytecode image
+(recommended, see below) or a path to a local `.o` file (default:
+`/afxdp/xdp_afxdp_redirect_bpfman.o`, shipped in the device plugin image).
+Only one of the two may be set. The object must contain an XSKMAP named
+`xsks_map`. For NICs with more than 64 queues, rebuild the default program
+with `make XSK_MAP_MAX_ENTRIES=<queues>`.
+
+**OCI bytecode image (recommended):** following [bpfman's eBPF Bytecode Image
+Specification](https://bpfman.io/main/getting-started/shipping-bytecode/),
+bpfman pulls and caches the image itself - no shared filesystem is needed
+between the device plugin and bpfman, whatever their deployment shape. The
+repo ships the image definition in [images/bytecode-redirect.dockerfile](./images/bytecode-redirect.dockerfile):
+
+```sh
+make bytecode-push BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
+```
+
+Then set `BpfmanBytecodeImage: quay.io/<org>/xdp-afxdp-redirect:latest` on the
+pool (as [deployments/daemonset-bpfman.yaml](./deployments/daemonset-bpfman.yaml)
+does).
+
+**File path caveat:** `BpfmanBytecodeFile` is resolved by the *bpfman daemon*,
+not the device plugin. The path must exist in bpfman's filesystem - the device
+plugin image's default path is only visible to bpfman when both share it (e.g.
+a hostPath volume, or a host-level bpfman running next to a plugin checkout).
+Use the OCI image to avoid the shared filesystem entirely.
 
 #### BpfmanFunction
 

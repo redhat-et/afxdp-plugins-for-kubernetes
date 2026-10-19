@@ -15,6 +15,7 @@ data:
              "mode":"primary",
              "BpfmanEnable":true,
              "BpfmanPriority":10,
+             "BpfmanBytecodeImage":"quay.io/afxdp-plugins-for-kubernetes/xdp-afxdp-redirect:latest",
              "drivers":[
                 {
                    "name":"i40e"
