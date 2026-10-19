@@ -78,8 +78,11 @@ func (r *handler) HasLibxdp() (bool, []string, error) {
 	foundLibbpf := false
 	var foundLibs []string
 
+	// Distributions with a multiarch layout (Debian, Ubuntu, Fedora) place
+	// libxdp in a triplet subdirectory such as /usr/lib/x86_64-linux-gnu,
+	// so scan one level below the library roots as well.
 	for _, path := range libPaths {
-		files, err := os.ReadDir(path)
+		entries, err := os.ReadDir(path)
 		if err != nil {
 			if strings.Contains(err.Error(), "no such file or directory") {
 				logging.Debugf("Directory %s does not exist", path)
@@ -89,10 +92,24 @@ func (r *handler) HasLibxdp() (bool, []string, error) {
 			}
 		}
 
-		for _, file := range files {
-			if strings.Contains(file.Name(), "libxdp.so") {
-				foundLibbpf = true
-				foundLibs = append(foundLibs, path+file.Name())
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				if strings.Contains(entry.Name(), "libxdp.so") {
+					foundLibbpf = true
+					foundLibs = append(foundLibs, path+entry.Name())
+				}
+				continue
+			}
+
+			subEntries, err := os.ReadDir(path + entry.Name() + "/")
+			if err != nil {
+				continue
+			}
+			for _, file := range subEntries {
+				if !file.IsDir() && strings.Contains(file.Name(), "libxdp.so") {
+					foundLibbpf = true
+					foundLibs = append(foundLibs, path+entry.Name()+"/"+file.Name())
+				}
 			}
 		}
 	}
