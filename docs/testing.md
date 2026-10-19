@@ -87,6 +87,22 @@ first ENI) - both can be pooled after excluding them from the cluster's default
 network; the prohibited-prefix list in `constants.Devices.Prohibited` does not
 block `ens5`.
 
+ENA-specific constraints found during validation:
+
+- **XDP requires MTU <= ~3500**: the AWS intra-VPC default is jumbo 9001, which
+  the ena driver rejects while XDP is attached - lower the pooled interface
+  (e.g. `ip link set dev ens6 mtu 1500`). DHCP renewals re-apply the VPC MTU,
+  so re-assert it before each test run.
+- **Combined channels must be at most half the maximum**: ena needs dedicated
+  XDP TX queues (`ethtool -L <if> combined <max/2>`), otherwise program
+  attachment fails with "no enough space for allocating XDP queues".
+- **Same-instance ENI hairpin is filtered** by the VPC router: traffic sent
+  from the instance to its own secondary ENI IP does not loop back. Datapath
+  tests need an external source, or an Elastic IP associated with the pooled
+  ENI.
+- **Runtime hugepage allocation** (`sysctl vm.nr_hugepages`) is only reflected
+  in the node's allocatable capacity after a kubelet restart.
+
 ```sh
 # on the instance: confirm the NIC and its XDP features
 ethtool -i ens5 | grep driver        # -> ena

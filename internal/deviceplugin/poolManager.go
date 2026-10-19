@@ -74,6 +74,7 @@ type PoolManager struct {
 	BpfmanSocket        string
 	BpfmanHandler       bpfman.Handler
 	bpfmanPrograms      map[string]uint32
+	stopWatcher         chan struct{}
 }
 
 func NewPoolManager(config PoolConfig) PoolManager {
@@ -99,6 +100,7 @@ func NewPoolManager(config PoolConfig) PoolManager {
 		BpfmanPriority:      config.BpfmanPriority,
 		BpfmanSocket:        config.BpfmanSocket,
 		bpfmanPrograms:      make(map[string]uint32),
+		stopWatcher:         make(chan struct{}),
 	}
 }
 
@@ -130,6 +132,9 @@ func (pm *PoolManager) Init(config PoolConfig) error {
 	}
 	logging.Infof("Pool "+pm.DevicePrefix+"/%s registered with Kubelet", pm.Name)
 
+	// keep the pool registered across kubelet restarts
+	go pm.watchSocket()
+
 	if pm.BpfMapPinningEnable {
 		var err error
 
@@ -145,9 +150,8 @@ func (pm *PoolManager) Init(config PoolConfig) error {
 		pm.DpCniSyncerServer.BpfMapPinEnable = true
 	}
 
-	if len(pm.Devices) > 0 {
-		pm.UpdateSignal <- true
-	}
+	// no initial UpdateSignal is needed here: ListAndWatch sends the
+	// current device list as soon as kubelet connects
 
 	return nil
 }
@@ -156,6 +160,16 @@ func (pm *PoolManager) Init(config PoolConfig) error {
 Terminate is called it terminate the PoolManager.
 */
 func (pm *PoolManager) Terminate() error {
+	// stop the socket watcher before tearing down the gRPC server, so it
+	// does not mistake our own cleanup for a kubelet restart
+	if pm.stopWatcher != nil {
+		select {
+		case <-pm.stopWatcher:
+			// already closed
+		default:
+			close(pm.stopWatcher)
+		}
+	}
 	pm.stopGRPC()
 	if err := pm.cleanup(); err != nil {
 		logging.Errorf("Cleanup error: %v", err)
@@ -330,17 +344,81 @@ func (pm *PoolManager) ListAndWatch(empty *pluginapi.Empty,
 
 	logging.Debugf("Pool "+pm.DevicePrefix+"/%s ListAndWatch started", pm.Name)
 
+	// send the current device list immediately, so a (re)connecting Kubelet
+	// advertises the pool's capacity without waiting for a device update.
+	// Kubelet opens a new ListAndWatch stream whenever the plugin
+	// (re-)registers with it.
+	if err := stream.Send(pm.deviceListResponse()); err != nil {
+		logging.Errorf("Failed to send initial device list to kubelet: %v", err)
+		return err
+	}
+
 	for {
 		<-pm.UpdateSignal
-		resp := new(pluginapi.ListAndWatchResponse)
-
-		for devName := range pm.Devices {
-			resp.Devices = append(resp.Devices, &pluginapi.Device{ID: devName, Health: pluginapi.Healthy})
-		}
-
-		if err := stream.Send(resp); err != nil {
+		if err := stream.Send(pm.deviceListResponse()); err != nil {
 			logging.Errorf("Failed to send stream to kubelet: %v", err)
+			return err
 		}
+	}
+}
+
+func (pm *PoolManager) deviceListResponse() *pluginapi.ListAndWatchResponse {
+	resp := new(pluginapi.ListAndWatchResponse)
+
+	for devName := range pm.Devices {
+		resp.Devices = append(resp.Devices, &pluginapi.Device{ID: devName, Health: pluginapi.Healthy})
+	}
+
+	return resp
+}
+
+/*
+watchSocket monitors this pool's device plugin socket and re-registers the
+pool with Kubelet when the socket disappears.
+
+Kubelet deletes the sockets in the device plugin directory whenever it
+restarts, so a plugin that only registered once at startup becomes invisible
+to the new Kubelet: the pool's resource capacity drops to zero and pods
+requesting the resource fail admission. Watching for the deleted socket and
+re-registering is the recommended behaviour in the Kubernetes device plugin
+documentation.
+*/
+func (pm *PoolManager) watchSocket() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	needRegister := false
+
+	for {
+		select {
+		case <-pm.stopWatcher:
+			return
+		case <-ticker.C:
+		}
+
+		if _, err := os.Stat(pm.DpAPISocket); err != nil {
+			logging.Warningf("Pool "+pm.DevicePrefix+"/%s: device plugin socket %s disappeared (kubelet restart?) - re-registering", pm.Name, pm.DpAPISocket)
+
+			pm.stopGRPC()
+			if err := pm.startGRPC(); err != nil {
+				logging.Errorf("Pool "+pm.DevicePrefix+"/%s: error restarting the gRPC server: %v", pm.Name, err)
+				continue
+			}
+			needRegister = true
+		}
+
+		if !needRegister {
+			continue
+		}
+
+		// kubelet may still be starting up: registration is retried on
+		// each tick until it succeeds
+		if err := pm.registerWithKubelet(); err != nil {
+			logging.Errorf("Pool "+pm.DevicePrefix+"/%s: error re-registering with Kubelet: %v", pm.Name, err)
+			continue
+		}
+		needRegister = false
+		logging.Infof("Pool "+pm.DevicePrefix+"/%s re-registered with Kubelet", pm.Name)
 	}
 }
 

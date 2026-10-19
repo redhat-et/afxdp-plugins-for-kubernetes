@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
@@ -254,6 +256,83 @@ func TestAllocate(t *testing.T) {
 
 		})
 	}
+}
+
+func TestListAndWatchSendsInitialDeviceList(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	config := PoolConfig{
+		Name: "myPool",
+		Mode: "primary",
+		Devices: map[string]*networking.Device{
+			"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+			"dev_2": networking.CreateTestDevice("dev_2", "primary", "ice", "0000:81:00.2", "68:05:ca:2d:e9:02", netHandler),
+		},
+	}
+
+	pm := NewPoolManager(config)
+
+	// fake ListAndWatch stream: collects responses and ends the stream
+	// (with an error) after two sends so the ListAndWatch goroutine returns
+	fake := &fakeListAndWatchServer{done: make(chan struct{})}
+	go func() {
+		_ = pm.ListAndWatch(&pluginapi.Empty{}, fake)
+	}()
+
+	// trigger the update response; the channel is unbuffered so this is
+	// received only after the initial list has been sent
+	pm.UpdateSignal <- true
+
+	select {
+	case <-fake.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for ListAndWatch responses")
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	require.Len(t, fake.responses, 2, "expected the initial list plus one update")
+
+	ids := func(resp *pluginapi.ListAndWatchResponse) []string {
+		var out []string
+		for _, dev := range resp.GetDevices() {
+			out = append(out, dev.GetID())
+		}
+		return out
+	}
+	assert.ElementsMatch(t, []string{"dev_1", "dev_2"}, ids(fake.responses[0]),
+		"the initial response must list the pool's devices")
+	assert.ElementsMatch(t, []string{"dev_1", "dev_2"}, ids(fake.responses[1]),
+		"the update response must list the pool's devices")
+}
+
+// fakeListAndWatchServer implements the parts of the
+// DevicePlugin_ListAndWatchServer interface that ListAndWatch uses. It ends
+// the stream (with an error) after collecting two responses so the
+// ListAndWatch goroutine terminates.
+type fakeListAndWatchServer struct {
+	pluginapi.DevicePlugin_ListAndWatchServer
+
+	mu        sync.Mutex
+	responses []*pluginapi.ListAndWatchResponse
+	done      chan struct{}
+}
+
+func (f *fakeListAndWatchServer) Send(resp *pluginapi.ListAndWatchResponse) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.responses = append(f.responses, resp)
+
+	if len(f.responses) >= 2 {
+		select {
+		case <-f.done:
+		default:
+			close(f.done)
+		}
+		return errors.New("end of test stream")
+	}
+	return nil
 }
 
 func TestAllocateBpfman(t *testing.T) {

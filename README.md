@@ -495,14 +495,18 @@ with `make XSK_MAP_MAX_ENTRIES=<queues>`.
 Specification](https://bpfman.io/main/getting-started/shipping-bytecode/),
 bpfman pulls and caches the image itself - no shared filesystem is needed
 between the device plugin and bpfman, whatever their deployment shape. The
-repo ships the image definition in [images/bytecode-redirect.dockerfile](./images/bytecode-redirect.dockerfile):
+image is built (including the object file, from a clean checkout) and pushed
+with:
 
 ```sh
 make bytecode-push BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
 ```
 
-Then set `BpfmanBytecodeImage: quay.io/<org>/xdp-afxdp-redirect:latest` on the
-pool (as [deployments/daemonset-bpfman.yaml](./deployments/daemonset-bpfman.yaml)
+It is also built and pushed by the image CI workflow alongside the device
+plugin image (change `REGISTRY_ORG` in `.github/workflows/build-image.yml`
+when the registry organisation changes). Then set
+`BpfmanBytecodeImage: quay.io/<org>/xdp-afxdp-redirect:latest` on the pool
+(as [deployments/daemonset-bpfman.yaml](./deployments/daemonset-bpfman.yaml)
 does).
 
 **File path caveat:** `BpfmanBytecodeFile` is resolved by the *bpfman daemon*,

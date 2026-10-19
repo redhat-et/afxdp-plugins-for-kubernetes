@@ -170,6 +170,15 @@ managing the program.
 - The device plugin mounts `/run/bpfman-sock` (see
   `deployments/daemonset-bpfman.yaml`); no bpffs/UDS hostPath mounts are needed
   and the daemonset is not privileged
+- When running bpfman's CSI driver outside the operator's manifest, its
+  DaemonSet must mount `/var/lib/kubelet/pods` with
+  `mountPropagation: Bidirectional` - the CSI driver bind-mounts per-pod bpffs
+  volumes into that path, and without the shared propagation those mounts stay
+  private to the bpfman container's mount namespace and pods receive empty
+  directories. (The operator's DaemonSet already does this.)
+- The device plugin re-registers its pools with kubelet automatically after a
+  kubelet restart (kubelet deletes the device-plugin sockets at startup);
+  `afxdp/<pool>` capacity recovers within a few seconds.
 
 ## Application integration
 

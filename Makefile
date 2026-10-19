@@ -85,7 +85,7 @@ BYTECODE_IMAGE ?= quay.io/afxdp-plugins-for-kubernetes/xdp-afxdp-redirect
 BYTECODE_TAG ?= latest
 
 .PHONY: bytecode-image
-bytecode-image: image-builder-check buildxdp ## Build the XDP redirect bytecode OCI image (bpfman-compatible)
+bytecode-image: image-builder-check ## Build the XDP redirect bytecode OCI image (bpfman-compatible, self-building)
 	$(CTR_CMD) build --platform linux/amd64 -t $(BYTECODE_IMAGE):$(BYTECODE_TAG) -f images/bytecode-redirect.dockerfile .
 
 .PHONY: bytecode-push

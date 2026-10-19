@@ -19,11 +19,30 @@
 # no shared filesystem is needed between the device plugin and bpfman.
 # Point a pool's BpfmanBytecodeImage at the pushed reference.
 #
-# Build (requires the .o from `make buildxdp`):
-#   make bytecode-image BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
-# Push:
+# The object is built in the first stage (same flags as
+# internal/bpf/xdp-afxdp-redirect/Makefile) so the image builds from a clean
+# checkout. Override the XSKMAP size by changing XSK_MAP_MAX_ENTRIES in both
+# places. Currently single-architecture (amd64): the object is arch-specific
+# through its BTF.
+#
+# Build and push:
 #   make bytecode-push BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
+FROM ubuntu:24.04 AS builder
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends clang libbpf-dev linux-libc-dev && \
+    rm -rf /var/lib/apt/lists/*
+COPY internal/bpf/xdp-afxdp-redirect/xdp_afxdp_redirect.c /src/
+# Linux UAPI headers live in the multiarch include directory; -target bpf
+# drops it from clang's default search path
+RUN clang -target bpf \
+        -D __BPF_TRACING__ \
+        -I/usr/include/bpf \
+        -I/usr/include/x86_64-linux-gnu \
+        -Wall -Wno-unused-value -Wno-pointer-sign -Wno-compare-distinct-pointer-types \
+        -O2 -g -DBPFMAN -DXSK_MAP_MAX_ENTRIES=64 \
+        -c /src/xdp_afxdp_redirect.c -o /xdp_afxdp_redirect_bpfman.o
+
 FROM scratch
-COPY internal/bpf/xdp-afxdp-redirect/xdp_afxdp_redirect_bpfman.o /xdp_afxdp_redirect_bpfman.o
+COPY --from=builder /xdp_afxdp_redirect_bpfman.o /xdp_afxdp_redirect_bpfman.o
 LABEL io.ebpf.programs="{\"xdp_afxdp_redirect\":\"xdp\"}"
 LABEL io.ebpf.maps="{\"xsks_map\":\"xskmap\"}"
