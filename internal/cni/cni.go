@@ -54,6 +54,7 @@ type NetConfig struct {
 	LogLevel      string   `json:"logLevel,omitempty"`
 	EthtoolCmds   []string `json:"ethtoolCmds,omitempty"`
 	DPSyncer      bool     `json:"dpSyncer,omitempty"`
+	Bpfman        bool     `json:"bpfman,omitempty"`
 }
 
 func init() {
@@ -65,11 +66,11 @@ Validate validates the contents of the Config struct
 */
 func (n NetConfig) Validate() error {
 	var (
-		allowedLogLevels               = constants.Logging.Levels
-		allowedModes                   = constants.Plugins.Modes
-		ethtoolRegex                   = constants.EthtoolFilter.EthtoolFilterRegex
-		logLevels        []interface{} = make([]interface{}, len(allowedLogLevels))
-		modes            []interface{} = make([]interface{}, len(allowedModes))
+		allowedLogLevels = constants.Logging.Levels
+		allowedModes     = constants.Plugins.Modes
+		ethtoolRegex     = constants.EthtoolFilter.EthtoolFilterRegex
+		logLevels        = make([]interface{}, len(allowedLogLevels))
+		modes            = make([]interface{}, len(allowedModes))
 	)
 
 	for i, logLevel := range allowedLogLevels {
@@ -158,7 +159,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	cfg, err := loadConf(args.StdinData)
 	if err != nil {
 		err = fmt.Errorf("cmdAdd(): error loading config data: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -168,17 +169,17 @@ func CmdAdd(args *skel.CmdArgs) error {
 	containerNs, err := ns.GetNS(args.Netns)
 	if err != nil {
 		err = fmt.Errorf("cmdAdd(): failed to open container netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
-	defer containerNs.Close()
+	defer func() { _ = containerNs.Close() }()
 
 	logging.Infof("cmdAdd(): getting device from name")
 	device, err := netlink.LinkByName(cfg.Device)
 	if err != nil {
 		err = fmt.Errorf("cmdAdd(): failed to find device: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -187,18 +188,18 @@ func CmdAdd(args *skel.CmdArgs) error {
 	defaultNs, err := ns.GetCurrentNS()
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): failed to open default netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
-	defer defaultNs.Close()
+	defer func() { _ = defaultNs.Close() }()
 
 	logging.Infof("cmdAdd(): checking if IPAM is required")
 	if cfg.IPAM.Type != "" {
 		result, err = getIPAM(args, cfg, device, defaultNs)
 		if err != nil {
 			err = fmt.Errorf("cmdAdd(): error configuring IPAM on device %q: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -212,7 +213,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 			}
 			if ethInstalled {
 				logging.Debugf("cmdAdd(): ethtool found on host")
-				logging.Debugf("\t" + version)
+				logging.Debug("\t" + version)
 				logging.Infof("cmdAdd(): applying ethtool filters on device: %s", cfg.Device)
 				iPAddr, err := extractIP(result)
 				if err != nil {
@@ -233,7 +234,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	logging.Infof("cmdAdd(): moving device from default to container network namespace")
 	if err := netlink.LinkSetNsFd(device, int(containerNs.Fd())); err != nil {
 		err = fmt.Errorf("cmdAdd(): failed to move device %q to container netns: %w", device.Attrs().Name, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -244,7 +245,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 		logging.Infof("cmdAdd(): set device to UP state")
 		if err := netlink.LinkSetUp(device); err != nil {
 			err = fmt.Errorf("cmdAdd(): failed to set device %q to UP state: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -258,7 +259,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 		result, err = setIPAM(cfg, result, device, containerNs)
 		if err != nil {
 			err = fmt.Errorf("cmdAdd(): error configuring IPAM on device netns %q: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -281,7 +282,7 @@ func CmdDel(args *skel.CmdArgs) error {
 	cfg, err := loadConf(args.StdinData)
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): error loading config data: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -290,21 +291,21 @@ func CmdDel(args *skel.CmdArgs) error {
 	containerNs, err := ns.GetNS(args.Netns)
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): failed to open container netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
-	defer containerNs.Close()
+	defer func() { _ = containerNs.Close() }()
 
 	logging.Infof("cmdDel(): getting default network namespace")
 	defaultNs, err := ns.GetCurrentNS()
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): failed to open default netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
-	defer defaultNs.Close()
+	defer func() { _ = defaultNs.Close() }()
 
 	logging.Infof("cmdDel(): executing within container network namespace:")
 	if err := containerNs.Do(func(_ ns.NetNS) error {
@@ -313,7 +314,7 @@ func CmdDel(args *skel.CmdArgs) error {
 		device, err := netlink.LinkByName(cfg.Device)
 		if err != nil {
 			err = fmt.Errorf("cmdDel(): failed to find device %q in containerNS: %w", cfg.Device, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -321,7 +322,7 @@ func CmdDel(args *skel.CmdArgs) error {
 		logging.Infof("cmdDel(): moving device from container to default network namespace")
 		if err = netlink.LinkSetNsFd(device, int(defaultNs.Fd())); err != nil {
 			err = fmt.Errorf("cmdDel(): failed to move %q to host netns: %w", device.Attrs().Alias, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -346,14 +347,21 @@ func CmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	if !cfg.SkipUnloadBpf {
+	if !cfg.SkipUnloadBpf && !cfg.Bpfman {
 		logging.Infof("cmdDel(): removing BPF program from device")
 		if err := bpfHandler.Cleanbpf(cfg.Device); err != nil {
 			err = fmt.Errorf("cmdDel(): error removing BPF program from device: %w", err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
+	}
+
+	if cfg.Bpfman {
+		// In bpfman mode the XDP program follows the pool lifecycle and is
+		// managed by the device plugin via bpfman, so the program is left
+		// attached when the device returns to the host namespace.
+		logging.Infof("cmdDel(): bpfman mode, leaving the XDP program on device %s to the device plugin", cfg.Device)
 	}
 	if cfg.Mode == "primary" {
 		if cfg.EthtoolCmds != nil {
@@ -373,7 +381,10 @@ func CmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	if cfg.Mode == "cdq" {
+	// In bpfman mode CDQ subfunctions are eagerly created for the pool and
+	// deleted by the device plugin when the pool terminates, so they are
+	// left in place at pod teardown.
+	if cfg.Mode == "cdq" && !cfg.Bpfman {
 		isSf, err := netHandler.IsCdqSubfunction(cfg.Device)
 		if err != nil {
 			logging.Errorf("cmdDel(): error determining if %s is a CDQ subfunction: %v", cfg.Device, err)
@@ -414,11 +425,11 @@ func printLink(dev netlink.Link, cniVersion string, containerNs ns.NetNS) error 
 func getIPAM(args *skel.CmdArgs, cfg *NetConfig, device netlink.Link, netns ns.NetNS) (*current.Result, error) {
 	var result *current.Result
 
-	logging.Infof("configureIPAM(): running IPAM plugin: " + cfg.IPAM.Type)
+	logging.Infof("configureIPAM(): running IPAM plugin: %s", cfg.IPAM.Type)
 	ipamResult, err := ipam.ExecAdd(cfg.IPAM.Type, args.StdinData)
 	if err != nil {
 		err = fmt.Errorf("configureIPAM(): failed to get IPAM: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return result, err
 	}
@@ -437,14 +448,14 @@ func getIPAM(args *skel.CmdArgs, cfg *NetConfig, device netlink.Link, netns ns.N
 	result, err = current.NewResultFromResult(ipamResult)
 	if err != nil {
 		err = fmt.Errorf("configureIPAM(): Failed to convert IPAM result into current result type: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return result, err
 	}
 	logging.Infof("configureIPAM(): checking IPAM plugin returned IP")
 	if len(result.IPs) == 0 {
 		err = fmt.Errorf("configureIPAM(): IPAM plugin returned no IPs")
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return result, err
 	}
@@ -469,7 +480,7 @@ func setIPAM(cfg *NetConfig, result *current.Result, device netlink.Link, netns 
 		logging.Infof("configureIPAM(): setting device IP")
 		if err := ipam.ConfigureIface(device.Attrs().Name, result); err != nil {
 			err = fmt.Errorf("configureIPAM(): Error setting IPAM on device %q: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}

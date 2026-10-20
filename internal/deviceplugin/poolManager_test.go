@@ -18,14 +18,19 @@ package deviceplugin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/constants"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpf"
+	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/bpfman"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/networking"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/udsserver"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
@@ -251,4 +256,341 @@ func TestAllocate(t *testing.T) {
 
 		})
 	}
+}
+
+func TestListAndWatchSendsInitialDeviceList(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	config := PoolConfig{
+		Name: "myPool",
+		Mode: "primary",
+		Devices: map[string]*networking.Device{
+			"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+			"dev_2": networking.CreateTestDevice("dev_2", "primary", "ice", "0000:81:00.2", "68:05:ca:2d:e9:02", netHandler),
+		},
+	}
+
+	pm := NewPoolManager(config)
+
+	// fake ListAndWatch stream: collects responses and ends the stream
+	// (with an error) after two sends so the ListAndWatch goroutine returns
+	fake := &fakeListAndWatchServer{done: make(chan struct{})}
+	go func() {
+		_ = pm.ListAndWatch(&pluginapi.Empty{}, fake)
+	}()
+
+	// trigger the update response; the channel is unbuffered so this is
+	// received only after the initial list has been sent
+	pm.UpdateSignal <- true
+
+	select {
+	case <-fake.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for ListAndWatch responses")
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	require.Len(t, fake.responses, 2, "expected the initial list plus one update")
+
+	ids := func(resp *pluginapi.ListAndWatchResponse) []string {
+		var out []string
+		for _, dev := range resp.GetDevices() {
+			out = append(out, dev.GetID())
+		}
+		return out
+	}
+	assert.ElementsMatch(t, []string{"dev_1", "dev_2"}, ids(fake.responses[0]),
+		"the initial response must list the pool's devices")
+	assert.ElementsMatch(t, []string{"dev_1", "dev_2"}, ids(fake.responses[1]),
+		"the update response must list the pool's devices")
+}
+
+// fakeListAndWatchServer implements the parts of the
+// DevicePlugin_ListAndWatchServer interface that ListAndWatch uses. It ends
+// the stream (with an error) after collecting two responses so the
+// ListAndWatch goroutine terminates.
+type fakeListAndWatchServer struct {
+	pluginapi.DevicePlugin_ListAndWatchServer
+
+	mu        sync.Mutex
+	responses []*pluginapi.ListAndWatchResponse
+	done      chan struct{}
+}
+
+func (f *fakeListAndWatchServer) Send(resp *pluginapi.ListAndWatchResponse) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.responses = append(f.responses, resp)
+
+	if len(f.responses) >= 2 {
+		select {
+		case <-f.done:
+		default:
+			close(f.done)
+		}
+		return errors.New("end of test stream")
+	}
+	return nil
+}
+
+func TestAllocateBpfman(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	config := PoolConfig{
+		Name: "myPool",
+		Mode: "primary",
+		Devices: map[string]*networking.Device{
+			"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+			"dev_2": networking.CreateTestDevice("dev_2", "primary", "ice", "0000:81:00.2", "68:05:ca:2d:e9:02", netHandler),
+		},
+		UdsServerDisable:    false,
+		BpfMapPinningEnable: false,
+		BpfmanEnable:        true,
+		BpfmanBytecodeFile:  "/afxdp/xdp_afxdp_redirect_bpfman.o",
+		BpfmanFunction:      "xdp_afxdp_redirect",
+		BpfmanPriority:      10,
+		UID:                 1500,
+	}
+
+	pm := NewPoolManager(config)
+	pm.BpfmanHandler = bpfman.NewFakeHandler()
+
+	envVar := constants.Devices.EnvVarList + strings.ToUpper(pm.Name)
+
+	allocateRequest := &pluginapi.AllocateRequest{
+		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
+			{DevicesIDs: []string{"dev_1"}},
+		},
+	}
+
+	response, err := pm.Allocate(context.Background(), allocateRequest)
+	require.NoError(t, err)
+	require.Len(t, response.ContainerResponses, 1)
+
+	cresp := response.ContainerResponses[0]
+	assert.Equal(t, map[string]string{envVar: "dev_1"}, cresp.Envs)
+	assert.Empty(t, cresp.Mounts, "bpfman mode should not mount UDS sockets or pinned maps")
+
+	// the fake bpfman handler should not be used during Allocate; programs
+	// follow the pool lifecycle, not the pod lifecycle
+	fake := pm.BpfmanHandler.(*bpfman.FakeHandler)
+	assert.Empty(t, fake.Programs, "Allocate should not load bpfman programs")
+}
+
+func TestInitBpfman(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	newConfig := func() PoolConfig {
+		return PoolConfig{
+			Name: "myPool",
+			Mode: "primary",
+			Devices: map[string]*networking.Device{
+				"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+				"dev_2": networking.CreateTestDevice("dev_2", "primary", "ice", "0000:81:00.2", "68:05:ca:2d:e9:02", netHandler),
+			},
+			BpfmanEnable:       true,
+			BpfmanBytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			BpfmanFunction:     "xdp_afxdp_redirect",
+			BpfmanPriority:     10,
+		}
+	}
+
+	t.Run("loads a program per device", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		pm.BpfmanHandler = bpfman.NewFakeHandler()
+
+		require.NoError(t, pm.initBpfman())
+
+		fake := pm.BpfmanHandler.(*bpfman.FakeHandler)
+		assert.Len(t, fake.Programs, 2)
+		for devName, id := range pm.bpfmanPrograms {
+			assert.NotZero(t, id)
+			opts := fake.Programs[id]
+			require.NotNil(t, opts)
+			assert.Equal(t, devName, opts.Iface)
+			assert.Equal(t, "afxdp-myPool-"+devName, opts.ProgramName)
+			assert.Equal(t, int32(10), opts.Priority)
+			assert.Equal(t, "myPool", opts.ExtraMetadata[bpfman.MetadataKeyPool])
+			assert.Equal(t, devName, opts.ExtraMetadata[bpfman.MetadataKeyDevice])
+		}
+	})
+
+	t.Run("load error fails pool init", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+		fake.LoadError = errors.New("bpfman unavailable")
+		pm.BpfmanHandler = fake
+
+		err := pm.initBpfman()
+		require.Error(t, err)
+	})
+
+	t.Run("adopts existing programs and unloads orphans", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+
+		// program for dev_1 left over from a previous run
+		existing, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_1",
+			Iface:         "dev_1",
+			Priority:      10,
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
+		})
+		require.NoError(t, err)
+
+		// orphaned program for a device no longer in the pool
+		orphan, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_gone",
+			Iface:         "dev_gone",
+			Priority:      10,
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_gone"},
+		})
+		require.NoError(t, err)
+
+		pm.BpfmanHandler = fake
+		require.NoError(t, pm.initBpfman())
+
+		assert.Equal(t, existing.ID, pm.bpfmanPrograms["dev_1"], "existing program should be adopted")
+		require.Contains(t, pm.bpfmanPrograms, "dev_2", "missing program should be loaded")
+
+		_, stillLoaded := fake.Programs[orphan.ID]
+		assert.False(t, stillLoaded, "orphaned program should be unloaded")
+
+		assert.Len(t, fake.Programs, 2)
+	})
+
+	t.Run("reloads programs with mismatched configuration", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+
+		stale, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/old.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_1",
+			Iface:         "dev_1",
+			Priority:      10,
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
+		})
+		require.NoError(t, err)
+
+		pm.BpfmanHandler = fake
+		require.NoError(t, pm.initBpfman())
+
+		_, staleStillLoaded := fake.Programs[stale.ID]
+		assert.False(t, staleStillLoaded, "stale program should be unloaded")
+		assert.Len(t, fake.Programs, 2)
+		opts := fake.Programs[pm.bpfmanPrograms["dev_1"]]
+		require.NotNil(t, opts)
+		assert.Equal(t, "/afxdp/xdp_afxdp_redirect_bpfman.o", opts.BytecodeFile)
+	})
+
+	t.Run("rolls back loads when a device fails", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+		fake.LoadErrorForIface = map[string]error{
+			"dev_2": errors.New("bpfman unavailable"),
+		}
+		pm.BpfmanHandler = fake
+
+		err := pm.initBpfman()
+		require.Error(t, err)
+		assert.Empty(t, pm.bpfmanPrograms, "failed init should not leave tracked programs")
+		assert.Empty(t, fake.Programs, "failed init should roll back newly loaded programs")
+	})
+
+	t.Run("fails when unloading a mismatched program fails", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+
+		_, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/old.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_1",
+			Iface:         "dev_1",
+			Priority:      10,
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
+		})
+		require.NoError(t, err)
+
+		fake.UnloadError = errors.New("bpfman unavailable")
+		pm.BpfmanHandler = fake
+
+		err = pm.initBpfman()
+		require.Error(t, err)
+		assert.Len(t, fake.Programs, 1, "stale program should remain loaded when its unload fails")
+		assert.Empty(t, pm.bpfmanPrograms, "no programs should be tracked when init fails")
+	})
+
+	t.Run("removes CDQ subfunctions when init fails", func(t *testing.T) {
+		netHandler := &deleteRecordingHandler{FakeHandler: networking.NewFakeHandler()}
+		primary := networking.CreateTestDevice("ens1f0", "cdq", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler)
+
+		pm := NewPoolManager(PoolConfig{
+			Name: "myPool",
+			Mode: "cdq",
+			Devices: map[string]*networking.Device{
+				"ens1f0sf1": networking.CreateTestSubfunction(primary, "ens1f0sf1"),
+			},
+			BpfmanEnable:       true,
+			BpfmanBytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			BpfmanFunction:     "xdp_afxdp_redirect",
+			BpfmanPriority:     10,
+		})
+		pm.NetHandler = netHandler
+
+		fake := bpfman.NewFakeHandler()
+		fake.LoadError = errors.New("bpfman unavailable")
+		pm.BpfmanHandler = fake
+
+		require.Error(t, pm.initBpfman())
+		assert.Len(t, netHandler.deletedPortIndexes, 1, "CDQ subfunction should be deleted when init fails")
+	})
+}
+
+/*
+deleteRecordingHandler wraps the networking fake handler and records
+DeleteCdqSubfunction calls.
+*/
+type deleteRecordingHandler struct {
+	networking.FakeHandler
+	deletedPortIndexes []string
+}
+
+func (h *deleteRecordingHandler) DeleteCdqSubfunction(portIndex string) error {
+	h.deletedPortIndexes = append(h.deletedPortIndexes, portIndex)
+	return nil
+}
+
+func TestTerminateBpfman(t *testing.T) {
+	netHandler := networking.NewFakeHandler()
+
+	config := PoolConfig{
+		Name: "myPool",
+		Mode: "primary",
+		Devices: map[string]*networking.Device{
+			"dev_1": networking.CreateTestDevice("dev_1", "primary", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler),
+		},
+		BpfmanEnable:       true,
+		BpfmanBytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+		BpfmanFunction:     "xdp_afxdp_redirect",
+		BpfmanPriority:     10,
+	}
+
+	pm := NewPoolManager(config)
+	fake := bpfman.NewFakeHandler()
+	pm.BpfmanHandler = fake
+
+	require.NoError(t, pm.initBpfman())
+	require.Len(t, fake.Programs, 1)
+
+	require.NoError(t, pm.Terminate())
+
+	assert.Empty(t, fake.Programs, "pool programs should be unloaded on terminate")
+	assert.True(t, fake.Closed, "bpfman client should be closed on terminate")
 }

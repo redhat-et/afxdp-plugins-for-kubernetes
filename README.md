@@ -26,6 +26,54 @@ Alternatively, to customize the configuration:
   - Configure the pod spec to use a suitable Docker image and to reference the network attachment definition as well as the resource type from the Device Plugin. See comments in the example file.
   - `kubectl create -f pod-spec.yaml`
 
+## bpfman Mode (recommended)
+
+The plugins can delegate eBPF program management to [bpfman](https://github.com/bpfman/bpfman).
+In bpfman mode the Device Plugin loads the XDP redirect program on every netdev in a pool
+via bpfman's gRPC API when the pool starts, and unloads it when the pool terminates. The
+pinned XSKMAP is shared with pods by the bpfman CSI driver, so the Device Plugin no longer
+creates UDS servers or per-pod bpffs instances, and pods need no special privileges to
+access the map (kernel >= 5.19). Legacy UDS and map pinning modes remain fully supported.
+The design and rationale are described in [docs/bpfman-integration.md](./docs/bpfman-integration.md).
+
+Requirements:
+
+- A bpfman daemon with the gRPC API (`/run/bpfman-sock/bpfman.sock`) and CSI support
+  running on each node (e.g. deployed by the bpfman operator).
+- Kernel >= 5.6 for the XDP dispatcher (freplace) based attachment, >= 5.19 for
+  unprivileged pod access to the exposed maps.
+- Kubernetes >= 1.26 for CSI ephemeral inline volumes.
+- On SELinux-enforcing distributions, make sure the device plugin container can
+  reach the bpfman socket (see bpfman's
+  [SELinux distributions guide](https://bpfman.io/main/developer-guide/k8s-selinux-distros/)).
+
+Deploy with [deployments/daemonset-bpfman.yaml](./deployments/daemonset-bpfman.yaml) and
+see [examples/network-attachment-definition-bpfman.yaml](./examples/network-attachment-definition-bpfman.yaml)
+and [examples/pod-spec-bpfman.yaml](./examples/pod-spec-bpfman.yaml). The pod spec uses a
+CSI volume that exposes the pool's XSKMAPs under `/run/xdp/maps/<netdev>/xsks_map`:
+
+```yaml
+volumes:
+- name: afxdp-maps
+  csi:
+    driver: csi.bpfman.io
+    volumeAttributes:
+      csi.bpfman.io/programs-by-metadata: afxdp.io/pool=myPool
+      csi.bpfman.io/subpath-metadata: afxdp.io/device
+      csi.bpfman.io/maps: xsks_map
+```
+
+The application reads its netdev(s) from the `AFXDP_DEVICES_<pool>` environment variable
+and opens the corresponding pinned map. DPDK applications use the AF_XDP PMD with
+`use_pinned_map=1,dp_path=/run/xdp/maps/<netdev>/xsks_map`. For a pool with a single,
+well-known device the program can be requested directly with the
+`csi.bpfman.io/program: afxdp-<pool>-<netdev>` volume attribute instead.
+
+Because the XDP program follows the pool lifecycle (loaded at pool start rather than pod
+creation), there is no race between pod volume mounts and program loading, and idle pooled
+devices simply pass traffic to the stack. In CDQ pools, subfunctions are created eagerly
+when the pool starts and are not deleted at pod teardown.
+
 ## Prerequisites
 
 ### Running the Plugins
@@ -411,7 +459,7 @@ UdsServerDisable is a Boolean configuration. If set to true, devices in this poo
 
 BpfMapPinningEnable is a Boolean configuration. If set to true, will use BPF map pinning instead of a UDS to share an XSK map with a pod. By default, this is set to false. Should set UdsServerDisable to true when using this configuration.
 
-> **_NOTE:_**  When using this setting it's important to adjust the securityContext for the DP Daemonset to `privileged: true` to allow for bidirectional propagation of the volume where the BPF maps are pinned. this will no longer be needed when the DP is integrated with bpfman. An example deamonset configuration is shown in [deamonset-pinning.yaml](./deployments/daemonset-pinning.yaml)
+> **_NOTE:_**  When using this setting it's important to adjust the securityContext for the DP Daemonset to `privileged: true` to allow for bidirectional propagation of the volume where the BPF maps are pinned. This is not needed with [bpfman mode](#bpfman-mode-recommended), where the bpfman CSI driver exposes the maps to pods instead. An example deamonset configuration is shown in [deamonset-pinning.yaml](./deployments/daemonset-pinning.yaml)
 
 > **_NOTE:_**  If the kernel is <= 5.18, CAP_BPF capability should be added to the container in the Pod.
 
@@ -422,6 +470,63 @@ UdsTimeout is an integer configuration. This value sets the amount of time, in s
 #### RequiresUnprivilegedBpf
 
 RequiresUnprivilegedBpf is a Boolean configuration. Linux systems can be configured with a sysctl setting called _unprivileged_bpf_disabled_. If _unprivileged_bpf_disabled_ is set, it means eBPF operations cannot be performed by unprivileged users (or pods) on this host. If your use case requires unprivileged eBPF, this pool configuration should be set to true. When set to true, the pool will not take any devices from a node where unprivileged eBPF has been prohibited. This will mean that pods requesting devices from this pool will only be scheduled on nodes where unprivileged eBPF is allowed. The default value is false.
+
+#### BpfmanEnable
+
+BpfmanEnable is a Boolean configuration. If set to true, this pool uses bpfman to load and
+attach its XDP program instead of the device plugin's own BPF loading. The program is
+loaded onto every netdev in the pool when the pool starts (with the `bpfman.io/ProgramName`
+metadata `afxdp-<pool>-<netdev>`), and the pinned XSKMAP is exposed to pods by the bpfman
+CSI driver - see [bpfman Mode](#bpfman-mode-recommended). In this mode the UDS server and
+BPF map pinning are not used, CDQ subfunctions are created eagerly at pool start, and the
+XDP program is not unloaded at pod teardown. BpfmanEnable cannot be combined with
+BpfMapPinningEnable. By default, this is set to false.
+
+#### BpfmanBytecodeFile / BpfmanBytecodeImage
+
+The XDP bytecode loaded via bpfman: either the URL of an OCI bytecode image
+(recommended, see below) or a path to a local `.o` file (default:
+`/afxdp/xdp_afxdp_redirect_bpfman.o`, shipped in the device plugin image).
+Only one of the two may be set. The object must contain an XSKMAP named
+`xsks_map`. For NICs with more than 64 queues, rebuild the default program
+with `make XSK_MAP_MAX_ENTRIES=<queues>`.
+
+**OCI bytecode image (recommended):** following [bpfman's eBPF Bytecode Image
+Specification](https://bpfman.io/main/getting-started/shipping-bytecode/),
+bpfman pulls and caches the image itself - no shared filesystem is needed
+between the device plugin and bpfman, whatever their deployment shape. The
+image is built (including the object file, from a clean checkout) and pushed
+with:
+
+```sh
+make bytecode-push BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
+```
+
+It is also built and pushed by the image CI workflow alongside the device
+plugin image (change `REGISTRY_ORG` in `.github/workflows/build-image.yml`
+when the registry organisation changes). Then set
+`BpfmanBytecodeImage: quay.io/<org>/xdp-afxdp-redirect:latest` on the pool
+(as [deployments/daemonset-bpfman.yaml](./deployments/daemonset-bpfman.yaml)
+does).
+
+**File path caveat:** `BpfmanBytecodeFile` is resolved by the *bpfman daemon*,
+not the device plugin. The path must exist in bpfman's filesystem - the device
+plugin image's default path is only visible to bpfman when both share it (e.g.
+a hostPath volume, or a host-level bpfman running next to a plugin checkout).
+Use the OCI image to avoid the shared filesystem entirely.
+
+#### BpfmanFunction
+
+The XDP function name within the bytecode object. Defaults to `xdp_afxdp_redirect`.
+
+#### BpfmanPriority
+
+The XDP priority used when attaching via bpfman; programs with lower values run earlier in
+the dispatcher chain. Defaults to 10.
+
+#### bpfmanSocket (global)
+
+Path to the bpfman gRPC unix socket. Defaults to `/run/bpfman-sock/bpfman.sock`.
 
 #### Examples
 
@@ -539,6 +644,13 @@ The EthtoolCmds field is an array of strings. These strings should be formatted 
 From the [examples/network-attachment-definition.yaml](./examples/network-attachment-definition.yaml) file: **ethtoolCmds** field has two filters configured. This means the filters `ethtool -X <device> equal 5 start 3` and `ethtool --config-ntuple -device- flow-type udp4 dst-ip <ip> action` will be configured on all devices as they are being attached to the AF_XDP pods. The plugins will substitute `<device>` and `<ip>` accordingly.
 
 *Note: When setting ethtool commands in the **ethtoolCmds** field, the 'ethtool' prefix must be removed.
+
+## Testing
+
+See [docs/testing.md](./docs/testing.md) for the test environments (unit, kind, cloud
+instances and VMs - including zero-copy AF_XDP on `virtio_net` >= 6.11, `gve` and
+`mlx5_core` - and bare metal) and the test matrix covering the UDS, map pinning and
+bpfman modes, DPDK testpmd integration, CDQ subfunctions and busy polling.
 
 ## CLOC
 

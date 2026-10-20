@@ -136,7 +136,7 @@ It listens for and serves a single connection. Across this connection it validat
 and serves XSK file descriptors to the UDS Server app within the pod.
 */
 func (s *server) start() {
-	logging.Debugf("Initialising Unix domain socket: " + s.udsPath)
+	logging.Debugf("Initialising Unix domain socket: %s", s.udsPath)
 
 	// init
 	if err := s.uds.Init(s.udsPath, constants.Uds.Protocol, constants.Uds.MsgBufSize, constants.Uds.CtlBufSize, s.udsIdleTimeout, s.uid); err != nil {
@@ -245,12 +245,12 @@ func (s *server) read() (string, int, error) {
 		return "", 0, err
 	}
 
-	logging.Infof("Pod " + s.podName + " - Request: " + request)
+	logging.Infof("Pod %s - Request: %s", s.podName, request)
 	return request, fd, nil
 }
 
 func (s *server) write(response string) error {
-	logging.Infof("Pod " + s.podName + " - Response: " + response)
+	logging.Infof("Pod %s - Response: %s", s.podName, response)
 	if err := s.uds.Write(response, -1); err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func (s *server) write(response string) error {
 }
 
 func (s *server) writeWithFD(response string, fd int) error {
-	logging.Infof("Pod " + s.podName + " - Response: " + response + ", FD: " + strconv.Itoa(fd))
+	logging.Infof("Pod %s - Response: %s, FD: %d", s.podName, response, fd)
 	if err := s.uds.Write(response, fd); err != nil {
 		return err
 	}
@@ -277,12 +277,12 @@ func (s *server) handleFdRequest(request string) error {
 	iface := strings.ReplaceAll(words[1], " ", "")
 
 	if fd, ok := s.devices[iface]; ok {
-		logging.Debugf("Pod " + s.podName + " - Device " + iface + " recognised")
+		logging.Debugf("Pod %s - Device %s recognised", s.podName, iface)
 		if err := s.writeWithFD(constants.Uds.Handshake.ResponseFdAck, fd); err != nil {
 			return err
 		}
 	} else {
-		logging.Warningf("Pod " + s.podName + " - Device " + iface + " not recognised")
+		logging.Warningf("Pod %s - Device %s not recognised", s.podName, iface)
 		if err := s.write(constants.Uds.Handshake.ResponseFdNak); err != nil {
 			return err
 		}
@@ -292,10 +292,11 @@ func (s *server) handleFdRequest(request string) error {
 
 func (s *server) handleBusyPollRequest(request string, fd int) error {
 	if fd <= 0 {
-		logging.Errorf("Pod " + s.podName + " - Invalid file descriptor")
+		logging.Errorf("Pod %s - Invalid file descriptor", s.podName)
 		if err := s.write(constants.Uds.Handshake.ResponseBusyPollNak); err != nil {
 			return err
 		}
+		return nil
 	}
 
 	words := strings.Split(request, ",")
@@ -321,7 +322,7 @@ func (s *server) handleBusyPollRequest(request string, fd int) error {
 		return err
 	}
 
-	logging.Infof("Pod " + s.podName + " - Configuring busy poll, FD: " + strconv.Itoa(fd) + ", Timeout: " + timeoutString + ", Budget: " + budgetString)
+	logging.Infof("Pod %s - Configuring busy poll, FD: %d, Timeout: %s, Budget: %s", s.podName, fd, timeoutString, budgetString)
 
 	if err := s.bpf.ConfigureBusyPoll(fd, timeout, budget); err != nil {
 		logging.Errorf("Error configuring busy poll: %v", err)
@@ -338,7 +339,7 @@ func (s *server) handleBusyPollRequest(request string, fd int) error {
 }
 
 func (s *server) validatePod(podName string) (bool, error) {
-	logging.Debugf("Pod " + podName + " - Validating pod hostname")
+	logging.Debugf("Pod %s - Validating pod hostname", podName)
 
 	podResourceMap, err := s.podRes.GetPodResources()
 	if err != nil {
@@ -347,9 +348,9 @@ func (s *server) validatePod(podName string) (bool, error) {
 	}
 
 	if _, ok := podResourceMap[podName]; ok {
-		logging.Debugf("Pod " + podName + " - Found on node")
+		logging.Debugf("Pod %s - Found on node", podName)
 	} else {
-		logging.Warningf("Pod " + podName + " - Not found on node")
+		logging.Warningf("Pod %s - Not found on node", podName)
 		return false, nil
 	}
 
@@ -379,11 +380,11 @@ func (s *server) validatePod(podName string) (bool, error) {
 		}
 
 		if valid {
-			logging.Infof("Pod " + podName + " is valid for this UDS connection")
+			logging.Infof("Pod %s is valid for this UDS connection", podName)
 			return true, nil
 		}
 	}
 
-	logging.Warningf("Pod " + podName + " could not be validated for this UDS connection")
+	logging.Warningf("Pod %s could not be validated for this UDS connection", podName)
 	return false, nil
 }

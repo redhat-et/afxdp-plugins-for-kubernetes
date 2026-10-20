@@ -35,9 +35,9 @@ func (r *handler) SetEthtool(ethtoolFilters []string, interfaceName string, ipAd
 		return err
 	}
 	for _, ethtoolFilter := range ethtoolFilters {
-		ethtoolFilter = strings.Replace(ethtoolFilter, "-device-", interfaceName, -1)
+		ethtoolFilter = strings.ReplaceAll(ethtoolFilter, "-device-", interfaceName)
 
-		ethtoolFilter = strings.Replace(ethtoolFilter, "-ip-", ipAddr, -1)
+		ethtoolFilter = strings.ReplaceAll(ethtoolFilter, "-ip-", ipAddr)
 
 		cmd := exec.Command(ethtool, strings.Split(ethtoolFilter, " ")...)
 		stdout, err := cmd.CombinedOutput()

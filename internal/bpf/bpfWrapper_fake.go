@@ -33,7 +33,7 @@ LoadBpfSendXskMap is the GoLang wrapper for the C function Load_bpf_send_xsk_map
 In this fakeHandler it returns a hardcoded file descriptor.
 */
 func (f *fakeHandler) LoadBpfSendXskMap(ifname string) (int, error) {
-	var fakeFileDescriptor int = 7
+	var fakeFileDescriptor = 7
 	return fakeFileDescriptor, nil
 }
 

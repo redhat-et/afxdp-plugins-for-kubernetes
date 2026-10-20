@@ -12,3 +12,21 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      day: monday
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /pkg/goclient
+    schedule:
+      day: monday
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /pkg/subfunctions
+    schedule:
+      day: monday
+      interval: weekly

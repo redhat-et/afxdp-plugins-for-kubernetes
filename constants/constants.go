@@ -49,13 +49,13 @@ var (
 	deviceSecondaryMax   = 64                                                       // maximum number of secondary devices that can be created on top of a primary device
 
 	/* Drivers */
-	driversZeroCopy      = []string{"i40e", "E810", "ice", "veth"} // drivers that support zero copy AF_XDP
-	driversCdq           = []string{"ice"}                         // drivers that support CDQ subfunctions
-	driverValidNameRegex = `^[a-zA-Z0-9_-]+$`                      // regex to check if a string is a valid driver name
-	driverValidNameMin   = 1                                       // minimum length of a driver name
-	driverValidNameMax   = 50                                      // maximum length of a deiver name
-	driverPrimaryMin     = 1                                       // minimum number of primary devices a driver can take from a node
-	driverPrimaryMax     = 10                                      // maximum number of primary devices a driver can take from a node
+	driversZeroCopy      = []string{"i40e", "E810", "ice", "mlx5_core", "veth"} // drivers validated for AF_XDP use; zero-copy requires driver XSK support - see docs/testing.md for the support matrix
+	driversCdq           = []string{"ice"}                                      // drivers that support CDQ subfunctions
+	driverValidNameRegex = `^[a-zA-Z0-9_-]+$`                                   // regex to check if a string is a valid driver name
+	driverValidNameMin   = 1                                                    // minimum length of a driver name
+	driverValidNameMax   = 50                                                   // maximum length of a deiver name
+	driverPrimaryMin     = 1                                                    // minimum number of primary devices a driver can take from a node
+	driverPrimaryMax     = 10                                                   // maximum number of primary devices a driver can take from a node
 
 	/* Nodes */
 	nodeValidHostRegex = `^[a-zA-Z0-9-]+$` // regex to check if a string is a valid node name
@@ -73,6 +73,9 @@ var (
 	/* AF_XDP */
 	afxdpMinimumLinux = "4.18.0" // minimum Linux version for AF_XDP support
 
+	/* bpfman */
+	bpfmanMinimumLinux = "5.6.0" // minimum Linux version for bpfman mode: XDP dispatcher (freplace) attachment
+
 	/* UDS*/
 	udsMaxTimeout = 300              // maximum configurable uds timeout in seconds
 	udsMinTimeout = 30               // minimum (and default) uds timeout in seconds
@@ -87,6 +90,16 @@ var (
 	pinMapBaseDir = "/var/run/afxdp_dp/"
 	bpfMapPodPath = "/tmp/afxdp_dp/"
 	xsk_map       = "/xsks_map"
+
+	/* bpfman */
+	bpfmanSocketPath          = "/run/bpfman-sock/bpfman.sock"       // default bpfman gRPC unix socket
+	bpfmanDefaultBytecodeFile = "/afxdp/xdp_afxdp_redirect_bpfman.o" // default XDP bytecode loaded via bpfman, shipped in the DP image
+	bpfmanDefaultFunctionName = "xdp_afxdp_redirect"                 // default XDP function name within the bytecode object
+	bpfmanDefaultPriority     = int32(10)                            // default XDP priority, lower runs earlier in the dispatcher chain
+	bpfmanPriorityMin         = int32(1)                             // minimum XDP priority
+	bpfmanPriorityMax         = int32(10000)                         // maximum XDP priority
+	bpfmanProgramNamePrefix   = "afxdp"                              // prefix for bpfman.io/ProgramName metadata: afxdp-<pool>-<netdev>
+	bpfmanValidNameRegex      = `^[a-zA-Z0-9_.:/-]+$`                // regex to check a bytecode file path or image URL
 
 	udsDirFileMode = 0700 // permissions for the directory in which we create our uds sockets
 
@@ -107,8 +120,15 @@ var (
 	handshakeResponseBadRequest  = "/nak"                  // general non-acknowledgement response, usually indicates a bad request
 	handshakeResponseError       = "/error"                // general error occurred response, indicates an error occurred on the device plugin end
 
-	/*EthtoolFilters*/
+	/* EthtoolFilter*/
 	ethtoolFilterRegex = `^[a-zA-Z0-9-:.-/\s/g]+$` // regex to validate ethtool filter commands.
+
+	/* bpfman socket attribute naming */
+	bpfmanCsiDriverName = "csi.bpfman.io" // bpfman CSI driver name used in pod volume definitions
+
+	/* bpfman CSI map path inside pods */
+	bpfmanCsiMapPodPath = "/run/xdp/maps/" // conventional mountPath for the bpfman CSI volume exposing XSKMAPs
+	bpfmanCsiMapName    = "xsks_map"       // XSKMAP name pinned by the XDP programs loaded via bpfman
 )
 
 /* Public variables and types */
@@ -137,6 +157,8 @@ var (
 	EthtoolFilter ethtoolFilter
 	/* Bpf contains constants related to the BPF Map pinning */
 	Bpf bpf
+	/* Bpfman contains constants related to bpfman integration */
+	Bpfman bpfmanConf
 )
 
 type cni struct {
@@ -161,7 +183,7 @@ type plugins struct {
 }
 
 type afxdp struct {
-	MinumumKernel string
+	MinimumKernel string
 }
 
 type drivers struct {
@@ -228,6 +250,21 @@ type bpf struct {
 	Xsk_map       string
 }
 
+type bpfmanConf struct {
+	SocketPath             string
+	DefaultBytecodeFile    string
+	DefaultFunctionName    string
+	DefaultPriority        int32
+	PriorityMin            int32
+	PriorityMax            int32
+	ProgramNamePrefix      string
+	ValidBytecodeNameRegex string
+	CsiDriverName          string
+	CsiMapPodPath          string
+	CsiMapName             string
+	MinimumKernel          string
+}
+
 type handshake struct {
 	Version             string
 	RequestVersion      string
@@ -273,7 +310,7 @@ func init() {
 	}
 
 	Afxdp = afxdp{
-		MinumumKernel: afxdpMinimumLinux,
+		MinimumKernel: afxdpMinimumLinux,
 	}
 
 	Drivers = drivers{
@@ -354,6 +391,21 @@ func init() {
 		PinMapBaseDir: pinMapBaseDir,
 		BpfMapPodPath: bpfMapPodPath,
 		Xsk_map:       xsk_map,
+	}
+
+	Bpfman = bpfmanConf{
+		SocketPath:             bpfmanSocketPath,
+		DefaultBytecodeFile:    bpfmanDefaultBytecodeFile,
+		DefaultFunctionName:    bpfmanDefaultFunctionName,
+		DefaultPriority:        bpfmanDefaultPriority,
+		PriorityMin:            bpfmanPriorityMin,
+		PriorityMax:            bpfmanPriorityMax,
+		ProgramNamePrefix:      bpfmanProgramNamePrefix,
+		ValidBytecodeNameRegex: bpfmanValidNameRegex,
+		CsiDriverName:          bpfmanCsiDriverName,
+		CsiMapPodPath:          bpfmanCsiMapPodPath,
+		CsiMapName:             bpfmanCsiMapName,
+		MinimumKernel:          bpfmanMinimumLinux,
 	}
 
 	EthtoolFilter = ethtoolFilter{

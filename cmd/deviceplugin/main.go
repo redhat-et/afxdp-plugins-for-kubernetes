@@ -114,6 +114,35 @@ func main() {
 	}
 	logging.Infof("Found %d poolConfigs", len(poolConfigs))
 
+	// bpfman mode requires a kernel new enough for XDP dispatcher (freplace)
+	// based attachment
+	for _, poolConfig := range poolConfigs {
+		if !poolConfig.BpfmanEnable {
+			continue
+		}
+		linuxVersion, err := hostHandler.KernelVersion()
+		if err != nil {
+			logging.Errorf("Error checking kernel version for bpfman mode: %v", err)
+			exit(constants.Plugins.DevicePlugin.ExitHostError)
+		}
+		linuxInt, err := tools.KernelVersionInt(linuxVersion)
+		if err != nil {
+			logging.Errorf("Error converting kernel version %s to int: %v", linuxVersion, err)
+			exit(constants.Plugins.DevicePlugin.ExitHostError)
+		}
+		bpfmanMinInt, err := tools.KernelVersionInt(constants.Bpfman.MinimumKernel)
+		if err != nil {
+			logging.Errorf("Error converting bpfman minimum kernel version to int: %v", err)
+			exit(constants.Plugins.DevicePlugin.ExitHostError)
+		}
+		if linuxInt < bpfmanMinInt {
+			logging.Errorf("Pool %s uses bpfman mode, which requires kernel >= %s (host is running %s). Unprivileged pod access to the exposed maps additionally requires kernel >= 5.19",
+				poolConfig.Name, constants.Bpfman.MinimumKernel, linuxVersion)
+			exit(constants.Plugins.DevicePlugin.ExitPoolError)
+		}
+		break
+	}
+
 	dp := devicePlugin{
 		pools: make(map[string]deviceplugin.PoolManager),
 	}
@@ -243,7 +272,7 @@ func checkHost(host host.Handler) (bool, error) {
 
 	}
 
-	minLinuxInt, err := tools.KernelVersionInt(constants.Afxdp.MinumumKernel)
+	minLinuxInt, err := tools.KernelVersionInt(constants.Afxdp.MinimumKernel)
 	if err != nil {
 		err := fmt.Errorf("error converting minimum kernel version to int: %v", err)
 		return false, err
@@ -251,7 +280,7 @@ func checkHost(host host.Handler) (bool, error) {
 	}
 
 	if linuxInt < minLinuxInt {
-		logging.Warningf("Kernel version %v is below minimum requirement %v", linuxVersion, constants.Afxdp.MinumumKernel)
+		logging.Warningf("Kernel version %v is below minimum requirement %v", linuxVersion, constants.Afxdp.MinimumKernel)
 		return false, nil
 	}
 	logging.Debugf("Kernel version: %v meets minimum requirements", linuxVersion)
@@ -266,7 +295,7 @@ func checkHost(host host.Handler) (bool, error) {
 	if bpfInstalled {
 		logging.Debugf("Libbpf found on host:")
 		for _, lib := range libs {
-			logging.Debugf("\t" + lib)
+			logging.Debug("\t" + lib)
 		}
 	} else {
 		logging.Warningf("Libbpf not found on host")

@@ -186,3 +186,45 @@ The e2e test script can also do an extended run. In addition to the single conta
 
 To do the full extended run, add the flag -f or --full when calling the script:
 `./e2e-test.sh --full`
+
+## bpfman Mode Test
+
+`bpfman-e2e-test.sh` (or `make e2ebpfman` from the repo root) tests the plugins in
+bpfman mode. It verifies that the device plugin loads the pool's XDP program via
+bpfman, that the bpfman CSI driver exposes the pool's XSKMAPs into the pod under
+`/run/xdp/maps/<netdev>/xsks_map`, and that an unprivileged pod (no BPF capabilities)
+can open the XSKMAP. The in-pod checks are implemented by the `bpfmanTest` app
+(`bpfman/bpfmanTest.go`), the bpfman mode counterpart of `udsTest`.
+
+### Assumptions
+- A kind cluster with multus running (e.g. `make setup-kind label-kind-nodes setup-multus`)
+- The plugins and the DP image built (`make build image`)
+- bpfman deployed on the cluster, or deployable by the script via one of:
+  - `BPFMAN_OPERATOR_DIR`: path to a bpfman-operator checkout
+  - `BPFMAN_MANIFEST`: path or URL of a rendered bpfman deployment manifest
+  - bpfman already deployed (the `bpfman` namespace exists)
+- The CSI metadata-selector volume attributes (`csi.bpfman.io/programs-by-metadata`)
+  used by the test pod require a bpfman build containing that feature.
+
+### Run Test
+```sh
+BPFMAN_OPERATOR_DIR=../../bpfman-operator ./bpfman-e2e-test.sh
+# or, testing a locally built bpfman image:
+BPFMAN_OPERATOR_DIR=../../bpfman-operator BPFMAN_IMAGE=quay.io/bpfman/bpfman:dev ./bpfman-e2e-test.sh
+# keep bpfman deployed between runs:
+./bpfman-e2e-test.sh --keep-bpfman
+```
+
+### What Happens
+- bpfman is deployed (unless already present) and waited on.
+- The `bpfmanTest` app is built and added to the e2e test image, which is loaded
+  into kind alongside the device plugin image.
+- A network attachment definition with `"bpfman": true` is created.
+- The device plugin is deployed from `deployments/daemonset-kind-bpfman.yaml`
+  with a pool using `BpfmanEnable` on the kind veths.
+- A pod requesting `afxdp/myPool` is created with a bpfman CSI volume selecting
+  the pool's programs by metadata.
+- The pod's netdevs, environment variables and the `bpfmanTest` output are printed.
+  A successful run ends with `Test App - PASSED` and the script exits 0.
+- Everything except (optionally) bpfman is cleaned up at the end of each run.
+

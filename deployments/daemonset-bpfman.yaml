@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: afxdp-dp-bpfman-config
+  namespace: kube-system
+data:
+  config.json: |
+    {
+       "logLevel":"debug",
+       "logFile":"afxdp-dp.log",
+       "bpfmanSocket":"/run/bpfman-sock/bpfman.sock",
+       "pools":[
+          {
+             "name":"myPool",
+             "mode":"primary",
+             "BpfmanEnable":true,
+             "BpfmanPriority":10,
+             "BpfmanBytecodeImage":"quay.io/afxdp-plugins-for-kubernetes/xdp-afxdp-redirect:latest",
+             "drivers":[
+                {
+                   "name":"i40e"
+                },
+                {
+                   "name":"ice"
+                }
+             ]
+          }
+       ]
+    }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: afxdp-device-plugin-bpfman
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-afxdp-device-plugin-bpfman
+  namespace: kube-system
+  labels:
+    tier: node
+    app: afxdp
+spec:
+  selector:
+    matchLabels:
+      name: afxdp-device-plugin-bpfman
+  template:
+    metadata:
+      labels:
+        name: afxdp-device-plugin-bpfman
+        tier: node
+        app: afxdp
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: afxdp-device-plugin-bpfman
+      containers:
+        - name: kube-afxdp
+          image: quay.io/afxdp-plugins-for-kubernetes/afxdp-device-plugin:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              drop:
+                - all
+              add:
+                - SYS_ADMIN
+                - NET_ADMIN
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "40Mi"
+            limits:
+              cpu: "1"
+              memory: "200Mi"
+          volumeMounts:
+            - name: devicesock
+              mountPath: /var/lib/kubelet/device-plugins/
+            - name: resources
+              mountPath: /var/lib/kubelet/pod-resources/
+            - name: bpfmansock
+              mountPath: /run/bpfman-sock/
+            - name: config-volume
+              mountPath: /afxdp/config
+            - name: log
+              mountPath: /var/log/afxdp-k8s-plugins/
+            - name: cnibin
+              mountPath: /opt/cni/bin/
+      volumes:
+        - name: devicesock
+          hostPath:
+            path: /var/lib/kubelet/device-plugins/
+        - name: resources
+          hostPath:
+            path: /var/lib/kubelet/pod-resources/
+        # bpfman gRPC socket; requires a bpfman daemon (e.g. the bpfman
+        # operator DaemonSet) running on the node with CSI support enabled.
+        - name: bpfmansock
+          hostPath:
+            path: /run/bpfman-sock/
+        - name: config-volume
+          configMap:
+            name: afxdp-dp-bpfman-config
+            items:
+              - key: config.json
+                path: config.json
+        - name: log
+          hostPath:
+            path: /var/log/afxdp-k8s-plugins/
+        - name: cnibin
+          hostPath:
+            path: /opt/cni/bin/

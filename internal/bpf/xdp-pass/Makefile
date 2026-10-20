@@ -11,23 +11,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LLC ?= llc
 CLANG ?= clang
 
-all: xdppass
+# Linux UAPI headers (asm/types.h & friends) live in the multiarch include
+# directory; -target bpf drops it from clang's default search path.
+ARCH_INCLUDES := $(wildcard /usr/include/x86_64-linux-gnu /usr/include/aarch64-linux-gnu /usr/include/s390x-linux-gnu /usr/include/powerpc64le-linux-gnu)
 
-xdppass:
-	$(CLANG) -S \
+# Single-step BTF-aware build. BTF (-g) is required for libxdp/bpfman
+# dispatcher (freplace) based attachment and for CO-RE relocations.
+CLANG_FLAGS = \
 	-target bpf \
 	-D __BPF_TRACING__ \
 	-I/usr/include/bpf \
+	$(addprefix -I,$(ARCH_INCLUDES)) \
 	-Wall \
 	-Wno-unused-value \
 	-Wno-pointer-sign \
 	-Wno-compare-distinct-pointer-types \
 	-Werror \
-	-O2 -emit-llvm -c -g -o xdp_pass.ll xdp_pass.c
-	$(LLC) -march=bpf -filetype=obj -o xdp_pass.o xdp_pass.ll
+	-O2 -g
+
+all: xdp_pass.o
+
+xdp_pass.o: xdp_pass.c
+	$(CLANG) $(CLANG_FLAGS) -c -o $@ $<
 
 clean:
-	rm -f *.o xdp_pass.ll
+	rm -f *.o

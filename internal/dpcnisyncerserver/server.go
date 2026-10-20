@@ -27,7 +27,6 @@ import (
 	pb "github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/dpcnisyncer"
 	logging "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
@@ -131,18 +130,21 @@ func NewSyncerServer() (*SyncerServer, error) {
 			logging.Errorf("Could not RegisterNetDevServer: %v", err)
 		}
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, sockAddr, grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(), grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
-		}),
-	)
-	if err != nil {
-		logging.Errorf("Unable to establish test connection with gRPC server: %v", err)
-		return nil, err
+	deadline := time.Now().Add(5 * time.Second)
+	var dialErr error
+	for time.Now().Before(deadline) {
+		var c net.Conn
+		c, dialErr = net.DialTimeout(protocol, sockAddr, time.Second)
+		if dialErr == nil {
+			_ = c.Close()
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
-	conn.Close()
+	if dialErr != nil {
+		logging.Errorf("Unable to establish test connection with gRPC server: %v", dialErr)
+		return nil, dialErr
+	}
 	logging.Debugf("NewSyncerServer up and Running")
 	return server, nil
 }

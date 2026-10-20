@@ -180,18 +180,18 @@ func TestPrettyString(t *testing.T) {
 	}{
 		{
 			object: makeTestData(`"`, -0, []string{""}, "hello world"),
-			expected: strings.Replace(
+			expected: strings.ReplaceAll(
 				`{
 				  "Str": "\"",
 				  "Integer": 0,
 				  "Array": [
 				    ""
 				  ]
-				}`, "\t", "", -1),
+				}`, "\t", ""),
 		},
 		{
 			object: makeTestData("afxdp", 30, []string{"veth1", "cni0"}, "veth7b0b36aa@if3"),
-			expected: strings.Replace(
+			expected: strings.ReplaceAll(
 				`{
 				  "Str": "afxdp",
 				  "Integer": 30,
@@ -199,25 +199,25 @@ func TestPrettyString(t *testing.T) {
 				    "veth1",
 				    "cni0"
 				  ]
-				}`, "\t", "", -1),
+				}`, "\t", ""),
 		},
 		{
 			object: makeTestData("", 0, nil, ""),
-			expected: strings.Replace(
+			expected: strings.ReplaceAll(
 				`{
 				  "Str": "",
 				  "Integer": 0,
 				  "Array": null
-				}`, "\t", "", -1),
+				}`, "\t", ""),
 		},
 		{
 			object: makeTestData("//", 034, []string{}, ""),
-			expected: strings.Replace(
+			expected: strings.ReplaceAll(
 				`{
 				  "Str": "//",
 				  "Integer": 28,
 				  "Array": []
-				}`, "\t", "", -1),
+				}`, "\t", ""),
 		},
 	}
 	for i, tc := range testCases {

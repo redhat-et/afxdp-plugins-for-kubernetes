@@ -1142,13 +1142,198 @@ func TestReadConfigFile(t *testing.T) {
 			err := os.WriteFile(testDir, content, 0666)
 			require.NoError(t, err, "Can't create temporary file")
 
-			defer os.RemoveAll(dir)
+			defer func() { _ = os.RemoveAll(dir) }()
 
 			err = readConfigFile(testDir)
 			if err == nil {
 				assert.Equal(t, tc.expErr, err, "Error was expected")
 			} else {
 				require.Error(t, tc.expErr, "Unexpected error returned")
+				assert.Contains(t, err.Error(), tc.expErr.Error(), "Unexpected error returned")
+			}
+		})
+	}
+}
+
+func TestReadConfigFileBpfman(t *testing.T) {
+	testCases := []struct {
+		name       string
+		configFile string
+		expErr     error
+	}{
+		{
+			name: "bpfman and pinning cannot be combined",
+			configFile: `{
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"BpfMapPinningEnable": true,
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanPinningConflictError),
+		},
+		{
+			name: "only one bytecode source can be set",
+			configFile: `{
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"BpfmanBytecodeFile": "/afxdp/xdp_afxdp_redirect_bpfman.o",
+									"BpfmanBytecodeImage": "quay.io/afxdp/xdp-redirect:latest",
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanBytecodeConflictErr),
+		},
+		{
+			name: "bytecode file must be valid",
+			configFile: `{
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"BpfmanBytecodeFile": "not a valid path!",
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanBytecodeValidErr),
+		},
+		{
+			name: "bytecode cannot be set when bpfman is disabled",
+			configFile: `{
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanBytecodeFile": "/afxdp/xdp_afxdp_redirect_bpfman.o",
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanBytecodeValidErr),
+		},
+		{
+			name: "priority must not be below min",
+			configFile: `{
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"BpfmanPriority": -5,
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanPriorityError),
+		},
+		{
+			name: "priority must not be above max",
+			configFile: `{
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"BpfmanPriority": 10001,
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanPriorityError),
+		},
+		{
+			name: "socket must be an absolute path",
+			configFile: `{
+							"bpfmanSocket": "not/a/socket",
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: errors.New(bpfmanSocketValidError),
+		},
+		{
+			name: "valid bpfman pool",
+			configFile: `{
+							"bpfmanSocket": "/run/bpfman-sock/bpfman.sock",
+							"pools":[
+								{
+									"name":"testPool",
+									"mode":"primary",
+									"BpfmanEnable": true,
+									"BpfmanBytecodeImage": "quay.io/afxdp/xdp-redirect:latest",
+									"BpfmanPriority": 50,
+									"devices":[
+										{
+											"name":"dev1"
+										}
+									]
+								}
+							]
+						}`,
+			expErr: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfgFile = nil
+			content := []byte(tc.configFile)
+			dir, dirErr := os.MkdirTemp("/tmp", "test-afxdp-")
+			require.NoError(t, dirErr, "Can't create temporary directory")
+			testDir := filepath.Join(dir, "tmpfile")
+			err := os.WriteFile(testDir, content, 0666)
+			require.NoError(t, err, "Can't create temporary file")
+
+			defer func() { _ = os.RemoveAll(dir) }()
+
+			err = readConfigFile(testDir)
+			if tc.expErr == nil {
+				assert.NoError(t, err, "Unexpected error returned")
+			} else {
+				require.Error(t, err, "Error was expected")
 				assert.Contains(t, err.Error(), tc.expErr.Error(), "Unexpected error returned")
 			}
 		})
@@ -1186,7 +1371,7 @@ func FuzzReadConfigFile(f *testing.F) {
 		err := os.WriteFile(testDir, content, 0666)
 		require.NoError(t, err, "Can't create temporary file")
 
-		defer os.RemoveAll(dir)
+		defer func() { _ = os.RemoveAll(dir) }()
 
 		err = readConfigFile(testDir)
 		require.NoError(t, err, "Can't readConfigFile")

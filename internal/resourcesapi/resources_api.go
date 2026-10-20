@@ -16,13 +16,13 @@
 package resourcesapi
 
 import (
+	"context"
+	"time"
+
 	logging "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	api "k8s.io/kubelet/pkg/apis/podresources/v1"
-	"net"
-	"time"
 )
 
 const (
@@ -76,19 +76,15 @@ func getPodResources(socket string) (*api.ListPodResourcesResponse, error) {
 	defer cancel()
 
 	logging.Debugf("Opening Pod Resource API connection")
-	conn, err := grpc.DialContext(ctx, socket, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(),
-		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
-		}),
-	)
+	conn, err := grpc.NewClient("unix:"+socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logging.Errorf("Error connecting to Pod Resource API: %v", err)
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	defer func() {
 		logging.Debugf("Closing Pod Resource API connection")
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	logging.Debugf("Requesting pod resource list")
