@@ -258,14 +258,14 @@ func GenerateRandomSocketName(directory string, udsDirFileMode os.FileMode) (str
 	//verify it is a directory, in case of pre existing file
 	if !fileInfo.IsDir() {
 		err = fmt.Errorf("%s is not a directory", directory)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 		return "", err
 	}
 
 	//verify the permissions are correct, in case of pre existing dir
 	if fileInfo.Mode().Perm() != udsDirFileMode {
 		err = fmt.Errorf("incorrect permissions on directory %s", directory)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 		return "", err
 	}
 
@@ -274,7 +274,7 @@ func GenerateRandomSocketName(directory string, udsDirFileMode os.FileMode) (str
 	for {
 		if count >= 5 {
 			err = fmt.Errorf("error generating a unique UDS filepath")
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 			return "", err
 		}
 

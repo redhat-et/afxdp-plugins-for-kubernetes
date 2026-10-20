@@ -158,7 +158,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	cfg, err := loadConf(args.StdinData)
 	if err != nil {
 		err = fmt.Errorf("cmdAdd(): error loading config data: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -168,7 +168,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	containerNs, err := ns.GetNS(args.Netns)
 	if err != nil {
 		err = fmt.Errorf("cmdAdd(): failed to open container netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -178,7 +178,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	device, err := netlink.LinkByName(cfg.Device)
 	if err != nil {
 		err = fmt.Errorf("cmdAdd(): failed to find device: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -187,7 +187,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	defaultNs, err := ns.GetCurrentNS()
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): failed to open default netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -198,7 +198,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 		result, err = getIPAM(args, cfg, device, defaultNs)
 		if err != nil {
 			err = fmt.Errorf("cmdAdd(): error configuring IPAM on device %q: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -212,7 +212,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 			}
 			if ethInstalled {
 				logging.Debugf("cmdAdd(): ethtool found on host")
-				logging.Debugf("\t" + version)
+				logging.Debug("\t" + version)
 				logging.Infof("cmdAdd(): applying ethtool filters on device: %s", cfg.Device)
 				iPAddr, err := extractIP(result)
 				if err != nil {
@@ -233,7 +233,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 	logging.Infof("cmdAdd(): moving device from default to container network namespace")
 	if err := netlink.LinkSetNsFd(device, int(containerNs.Fd())); err != nil {
 		err = fmt.Errorf("cmdAdd(): failed to move device %q to container netns: %w", device.Attrs().Name, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -244,7 +244,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 		logging.Infof("cmdAdd(): set device to UP state")
 		if err := netlink.LinkSetUp(device); err != nil {
 			err = fmt.Errorf("cmdAdd(): failed to set device %q to UP state: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -258,7 +258,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 		result, err = setIPAM(cfg, result, device, containerNs)
 		if err != nil {
 			err = fmt.Errorf("cmdAdd(): error configuring IPAM on device netns %q: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -281,7 +281,7 @@ func CmdDel(args *skel.CmdArgs) error {
 	cfg, err := loadConf(args.StdinData)
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): error loading config data: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -290,7 +290,7 @@ func CmdDel(args *skel.CmdArgs) error {
 	containerNs, err := ns.GetNS(args.Netns)
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): failed to open container netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -300,7 +300,7 @@ func CmdDel(args *skel.CmdArgs) error {
 	defaultNs, err := ns.GetCurrentNS()
 	if err != nil {
 		err = fmt.Errorf("cmdDel(): failed to open default netns %q: %w", args.Netns, err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return err
 	}
@@ -313,7 +313,7 @@ func CmdDel(args *skel.CmdArgs) error {
 		device, err := netlink.LinkByName(cfg.Device)
 		if err != nil {
 			err = fmt.Errorf("cmdDel(): failed to find device %q in containerNS: %w", cfg.Device, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -321,7 +321,7 @@ func CmdDel(args *skel.CmdArgs) error {
 		logging.Infof("cmdDel(): moving device from container to default network namespace")
 		if err = netlink.LinkSetNsFd(device, int(defaultNs.Fd())); err != nil {
 			err = fmt.Errorf("cmdDel(): failed to move %q to host netns: %w", device.Attrs().Alias, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -350,7 +350,7 @@ func CmdDel(args *skel.CmdArgs) error {
 		logging.Infof("cmdDel(): removing BPF program from device")
 		if err := bpfHandler.Cleanbpf(cfg.Device); err != nil {
 			err = fmt.Errorf("cmdDel(): error removing BPF program from device: %w", err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
@@ -414,11 +414,11 @@ func printLink(dev netlink.Link, cniVersion string, containerNs ns.NetNS) error 
 func getIPAM(args *skel.CmdArgs, cfg *NetConfig, device netlink.Link, netns ns.NetNS) (*current.Result, error) {
 	var result *current.Result
 
-	logging.Infof("configureIPAM(): running IPAM plugin: " + cfg.IPAM.Type)
+	logging.Infof("configureIPAM(): running IPAM plugin: %s", cfg.IPAM.Type)
 	ipamResult, err := ipam.ExecAdd(cfg.IPAM.Type, args.StdinData)
 	if err != nil {
 		err = fmt.Errorf("configureIPAM(): failed to get IPAM: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return result, err
 	}
@@ -437,14 +437,14 @@ func getIPAM(args *skel.CmdArgs, cfg *NetConfig, device netlink.Link, netns ns.N
 	result, err = current.NewResultFromResult(ipamResult)
 	if err != nil {
 		err = fmt.Errorf("configureIPAM(): Failed to convert IPAM result into current result type: %w", err)
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return result, err
 	}
 	logging.Infof("configureIPAM(): checking IPAM plugin returned IP")
 	if len(result.IPs) == 0 {
 		err = fmt.Errorf("configureIPAM(): IPAM plugin returned no IPs")
-		logging.Errorf(err.Error())
+		logging.Error(err.Error())
 
 		return result, err
 	}
@@ -469,7 +469,7 @@ func setIPAM(cfg *NetConfig, result *current.Result, device netlink.Link, netns 
 		logging.Infof("configureIPAM(): setting device IP")
 		if err := ipam.ConfigureIface(device.Attrs().Name, result); err != nil {
 			err = fmt.Errorf("configureIPAM(): Error setting IPAM on device %q: %w", device.Attrs().Name, err)
-			logging.Errorf(err.Error())
+			logging.Error(err.Error())
 
 			return err
 		}
