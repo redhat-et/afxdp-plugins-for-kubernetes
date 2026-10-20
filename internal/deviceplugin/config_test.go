@@ -1142,7 +1142,7 @@ func TestReadConfigFile(t *testing.T) {
 			err := os.WriteFile(testDir, content, 0666)
 			require.NoError(t, err, "Can't create temporary file")
 
-			defer os.RemoveAll(dir)
+			defer func() { _ = os.RemoveAll(dir) }()
 
 			err = readConfigFile(testDir)
 			if err == nil {
@@ -1327,7 +1327,7 @@ func TestReadConfigFileBpfman(t *testing.T) {
 			err := os.WriteFile(testDir, content, 0666)
 			require.NoError(t, err, "Can't create temporary file")
 
-			defer os.RemoveAll(dir)
+			defer func() { _ = os.RemoveAll(dir) }()
 
 			err = readConfigFile(testDir)
 			if tc.expErr == nil {
@@ -1371,7 +1371,7 @@ func FuzzReadConfigFile(f *testing.F) {
 		err := os.WriteFile(testDir, content, 0666)
 		require.NoError(t, err, "Can't create temporary file")
 
-		defer os.RemoveAll(dir)
+		defer func() { _ = os.RemoveAll(dir) }()
 
 		err = readConfigFile(testDir)
 		require.NoError(t, err, "Can't readConfigFile")

@@ -66,11 +66,11 @@ Validate validates the contents of the Config struct
 */
 func (n NetConfig) Validate() error {
 	var (
-		allowedLogLevels               = constants.Logging.Levels
-		allowedModes                   = constants.Plugins.Modes
-		ethtoolRegex                   = constants.EthtoolFilter.EthtoolFilterRegex
-		logLevels        []interface{} = make([]interface{}, len(allowedLogLevels))
-		modes            []interface{} = make([]interface{}, len(allowedModes))
+		allowedLogLevels = constants.Logging.Levels
+		allowedModes     = constants.Plugins.Modes
+		ethtoolRegex     = constants.EthtoolFilter.EthtoolFilterRegex
+		logLevels        = make([]interface{}, len(allowedLogLevels))
+		modes            = make([]interface{}, len(allowedModes))
 	)
 
 	for i, logLevel := range allowedLogLevels {
@@ -173,7 +173,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 
 		return err
 	}
-	defer containerNs.Close()
+	defer func() { _ = containerNs.Close() }()
 
 	logging.Infof("cmdAdd(): getting device from name")
 	device, err := netlink.LinkByName(cfg.Device)
@@ -192,7 +192,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 
 		return err
 	}
-	defer defaultNs.Close()
+	defer func() { _ = defaultNs.Close() }()
 
 	logging.Infof("cmdAdd(): checking if IPAM is required")
 	if cfg.IPAM.Type != "" {
@@ -295,7 +295,7 @@ func CmdDel(args *skel.CmdArgs) error {
 
 		return err
 	}
-	defer containerNs.Close()
+	defer func() { _ = containerNs.Close() }()
 
 	logging.Infof("cmdDel(): getting default network namespace")
 	defaultNs, err := ns.GetCurrentNS()
@@ -305,7 +305,7 @@ func CmdDel(args *skel.CmdArgs) error {
 
 		return err
 	}
-	defer defaultNs.Close()
+	defer func() { _ = defaultNs.Close() }()
 
 	logging.Infof("cmdDel(): executing within container network namespace:")
 	if err := containerNs.Do(func(_ ns.NetNS) error {

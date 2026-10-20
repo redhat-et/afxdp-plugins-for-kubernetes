@@ -25,7 +25,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LINTER_RULES_PATH: /
           VALIDATE_BASH: true
-          VALIDATE_GO: true
+          # Go linting runs in the go-static-tools job: internal/bpf needs
+          # libxdp (cgo), which is not available inside the super-linter
+          # container.
+          VALIDATE_GO: false
           VALIDATE_DOCKERFILE_HADOLINT: true
           VALIDATE_CLANG_FORMAT: true
           VALIDATE_JSON: true
@@ -105,6 +108,11 @@ jobs:
 
     - name: Install staticcheck
       run: go install honnef.co/go/tools/cmd/staticcheck@2026.1
+
+    - name: Run golangci-lint
+      run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}":/app -w /app golangci/golangci-lint:v2.12.2 sh -c \
+            "apt-get update -qq >/dev/null && apt-get install -qq -y --no-install-recommends libxdp-dev libbpf-dev pkg-config >/dev/null && golangci-lint run"
 
     - name: run static analysis
       run: make static-ci

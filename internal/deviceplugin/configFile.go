@@ -198,7 +198,7 @@ func (c configFile_Node) Validate() error {
 }
 
 func (c configFile_Pool) Validate() error {
-	var iModes []interface{} = make([]interface{}, len(constants.Plugins.Modes))
+	var iModes = make([]interface{}, len(constants.Plugins.Modes))
 
 	for i, mode := range constants.Plugins.Modes {
 		iModes[i] = mode
@@ -238,8 +238,8 @@ func (c configFile_Pool) Validate() error {
 		),
 		validation.Field(
 			&c.UID,
-			validation.When(!(c.UID == 0), validation.Max(constants.UID.Maximum)),
-			validation.When(!(c.UID == 0), validation.Min(constants.UID.Minimum)),
+			validation.When(c.UID != 0, validation.Max(constants.UID.Maximum)),
+			validation.When(c.UID != 0, validation.Min(constants.UID.Minimum)),
 		),
 		validation.Field(
 			&c.BpfmanBytecodeFile,
@@ -272,7 +272,7 @@ func (c configFile_Pool) Validate() error {
 }
 
 func (c configFile) Validate() error {
-	var iLogLevels []interface{} = make([]interface{}, len(constants.Logging.Levels))
+	var iLogLevels = make([]interface{}, len(constants.Logging.Levels))
 
 	for i, logLevel := range constants.Logging.Levels {
 		iLogLevels[i] = logLevel

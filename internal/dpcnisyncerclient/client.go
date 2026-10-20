@@ -37,7 +37,7 @@ func DeleteNetDev(name string) error {
 		logging.Errorf("error connecting to Server")
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	c := pb.NewNetDevClient(conn)
 	r, err := c.DelNetDev(ctx, &pb.DeleteNetDevReq{Name: name})

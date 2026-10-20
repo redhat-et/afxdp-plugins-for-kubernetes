@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM public.ecr.aws/docker/library/golang:1.25@sha256:2c7ebcaf2c1032b4b4d15df14b7edf3221b1e45dadfaa36ab6a2f8555feacaa6 AS cnibuilder
+FROM docker.io/library/golang:1.25@sha256:2c7ebcaf2c1032b4b4d15df14b7edf3221b1e45dadfaa36ab6a2f8555feacaa6 AS cnibuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 # libdw-dev and libzstd-dev are required for static linking against Debian trixie's
@@ -25,7 +25,7 @@ RUN apt-get update \
 && sed -i 's|LDFLAGS: -L. -lxdp -lbpf -lelf -lz|LDFLAGS: -L. -lxdp -lbpf -lelf -lz -lzstd -ldw|' internal/bpf/bpfWrapper.go \
 && make buildcni
 
-FROM public.ecr.aws/docker/library/golang:1.25-alpine@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587 AS dpbuilder
+FROM docker.io/library/golang:1.25-alpine@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587 AS dpbuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 RUN apk add --no-cache build-base \
@@ -36,7 +36,7 @@ RUN apk add --no-cache build-base \
 && apk add --no-cache clang \
 && make builddp
 
-FROM public.ecr.aws/docker/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+FROM docker.io/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 RUN apk --no-cache -U add iproute2-rdma acl \
       && apk add --no-cache xdp-tools
 COPY --from=cnibuilder /usr/src/afxdp_k8s_plugins/bin/afxdp /afxdp/afxdp

@@ -160,12 +160,12 @@ func startFakeServer(t *testing.T, srv *fakeServer) string {
 
 	dir, err := os.MkdirTemp("", "bpfman-test-")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 
 	socketPath := filepath.Join(dir, "bpfman.sock")
 	listener, err := net.Listen("unix", socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { listener.Close() })
+	t.Cleanup(func() { _ = listener.Close() })
 
 	grpcServer := grpc.NewServer()
 	v1.RegisterBpfmanServer(grpcServer, srv)
@@ -183,7 +183,7 @@ func TestLoadAndAttachXDP(t *testing.T) {
 
 	handler, err := NewHandler(socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { handler.Close() })
+	t.Cleanup(func() { _ = handler.Close() })
 
 	ctx := context.Background()
 
@@ -225,7 +225,7 @@ func TestLoadAndAttachXDPImage(t *testing.T) {
 
 	handler, err := NewHandler(socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { handler.Close() })
+	t.Cleanup(func() { _ = handler.Close() })
 
 	program, err := handler.LoadAndAttachXDP(context.Background(), XDPLoadOptions{
 		BytecodeImage: "quay.io/afxdp/xdp-redirect:latest",
@@ -243,7 +243,7 @@ func TestLoadAndAttachXDPValidation(t *testing.T) {
 
 	handler, err := NewHandler(socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { handler.Close() })
+	t.Cleanup(func() { _ = handler.Close() })
 
 	ctx := context.Background()
 
@@ -287,7 +287,7 @@ func TestLoadAndAttachXDPAttachErrorUnloadsOrphan(t *testing.T) {
 
 	handler, err := NewHandler(socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { handler.Close() })
+	t.Cleanup(func() { _ = handler.Close() })
 
 	srv.mu.Lock()
 	srv.attachErr = errors.New("attach failed")
@@ -313,7 +313,7 @@ func TestUnload(t *testing.T) {
 
 	handler, err := NewHandler(socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { handler.Close() })
+	t.Cleanup(func() { _ = handler.Close() })
 
 	ctx := context.Background()
 
@@ -341,7 +341,7 @@ func TestListXDPPrograms(t *testing.T) {
 
 	handler, err := NewHandler(socketPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { handler.Close() })
+	t.Cleanup(func() { _ = handler.Close() })
 
 	ctx := context.Background()
 

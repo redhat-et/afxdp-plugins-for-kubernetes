@@ -79,12 +79,12 @@ func getPodResources(socket string) (*api.ListPodResourcesResponse, error) {
 	conn, err := grpc.NewClient("unix:"+socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logging.Errorf("Error connecting to Pod Resource API: %v", err)
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	defer func() {
 		logging.Debugf("Closing Pod Resource API connection")
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	logging.Debugf("Requesting pod resource list")

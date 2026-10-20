@@ -201,13 +201,14 @@ func GetPoolConfigs(configFile string, net networking.Handler, host host.Handler
 		}
 
 		// uds timeout - user disabled, user did not set, user set
-		if pool.UdsTimeout == -1 {
+		switch pool.UdsTimeout {
+		case -1:
 			pool.UdsTimeout = 0
 			logging.Debugf("UDS timeout is disabled: %d seconds", pool.UdsTimeout)
-		} else if pool.UdsTimeout == 0 {
+		case 0:
 			pool.UdsTimeout = constants.Uds.MinTimeout
 			logging.Debugf("Using default UDS timeout: %d seconds", pool.UdsTimeout)
-		} else {
+		default:
 			logging.Debugf("UDS timeout is set to: %d seconds", pool.UdsTimeout)
 		}
 

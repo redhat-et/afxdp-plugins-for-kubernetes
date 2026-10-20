@@ -167,7 +167,7 @@ The control messages are also checked and returns the FD as an int, if present.
 */
 func (h *handler) Read() (string, int, error) {
 	var request = ""
-	var fd int = 0
+	var fd = 0
 	msgBuf := make([]byte, h.msgBufSize)
 	ctrlBuf := make([]byte, syscall.CmsgSpace(h.ctlBufSize))
 
@@ -270,7 +270,7 @@ func GenerateRandomSocketName(directory string, udsDirFileMode os.FileMode) (str
 	}
 
 	var sockPath string
-	var count int = 0
+	var count = 0
 	for {
 		if count >= 5 {
 			err = fmt.Errorf("error generating a unique UDS filepath")
@@ -297,15 +297,15 @@ func GenerateRandomSocketName(directory string, udsDirFileMode os.FileMode) (str
 
 func (h *handler) cleanup() {
 	logging.Debugf("Closing Unix listener")
-	h.listener.Close()
+	_ = h.listener.Close()
 	if h.conn != nil {
 		logging.Debugf("Closing connection")
-		h.conn.Close()
+		_ = h.conn.Close()
 	}
 	logging.Debugf("Closing socket file")
-	h.socketFile.Close()
+	_ = h.socketFile.Close()
 	logging.Debugf("Removing socket file")
-	os.Remove(h.socketPath)
+	_ = os.Remove(h.socketPath)
 }
 
 func ctrlBufHasValue(s []byte) bool {

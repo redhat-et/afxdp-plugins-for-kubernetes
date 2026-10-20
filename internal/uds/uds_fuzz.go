@@ -87,7 +87,7 @@ FuzzHandler seeds malformed fuzzing data to CNDP read().
 */
 func (f *fuzzHandler) Read() (string, int, error) {
 	var fuzzResponse string
-	var fd int = 0
+	var fd = 0
 
 	if firstCall {
 		fuzzResponse = "/connect, afxdp-fuzz-test"

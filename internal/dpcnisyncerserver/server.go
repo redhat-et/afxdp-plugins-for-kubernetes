@@ -136,7 +136,7 @@ func NewSyncerServer() (*SyncerServer, error) {
 		var c net.Conn
 		c, dialErr = net.DialTimeout(protocol, sockAddr, time.Second)
 		if dialErr == nil {
-			c.Close()
+			_ = c.Close()
 			break
 		}
 		time.Sleep(100 * time.Millisecond)

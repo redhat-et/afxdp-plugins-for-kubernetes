@@ -637,7 +637,7 @@ func (pm *PoolManager) registerWithKubelet() error {
 	if err != nil {
 		return fmt.Errorf("error connecting to Kubelet: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	client := pluginapi.NewRegistrationClient(conn)
 
@@ -678,7 +678,7 @@ func (pm *PoolManager) startGRPC() error {
 		var c net.Conn
 		c, dialErr = net.DialTimeout("unix", pm.DpAPISocket, time.Second)
 		if dialErr == nil {
-			c.Close()
+			_ = c.Close()
 			break
 		}
 		time.Sleep(100 * time.Millisecond)

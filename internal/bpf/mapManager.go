@@ -224,7 +224,7 @@ func generateRandomBpffsName(directory string) (string, error) {
 	}
 
 	var bpffspath string
-	var count int = 0
+	var count = 0
 	for {
 		if count >= 5 {
 			err = fmt.Errorf("error generating a unique UDS filepath")

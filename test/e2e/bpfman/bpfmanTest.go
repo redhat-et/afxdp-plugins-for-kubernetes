@@ -142,7 +142,7 @@ func checkMap(mapsPath, dev string) bool {
 		fmt.Printf("Test App Error: BPF_OBJ_GET failed: %v\n", err)
 		return false
 	}
-	defer unix.Close(fd)
+	defer func() { _ = unix.Close(fd) }()
 	fmt.Printf("Test App - XSKMAP opened by unprivileged pod, fd: %d\n", fd)
 
 	return true
