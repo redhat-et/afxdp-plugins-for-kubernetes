@@ -12,31 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM public.ecr.aws/docker/library/golang:1.20@sha256:efe38cb419e2b2012f66d1782d2efe2fd8884c71d9f342581e1697ba9047b5f8 AS cnibuilder
+# Bookworm rather than trixie: trixie's elfutils (0.192) ships a libelf.a that
+# references eu_search_tree_* symbols provided by no trixie package, which
+# breaks static linking of the CNI.
+FROM docker.io/library/golang:1.25-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS cnibuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 RUN apt-get update \
-&& apt-get -y install --no-install-recommends libxdp-dev=1.3.1-1 \
-&& apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends clang=1:14.0-55.7~deb12u1 \
-&& apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends llvm=1:14.0-55.7~deb12u1 \
-&& apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends gcc-multilib=4:12.2.0-3 \
+&& apt-get -y install --no-install-recommends libxdp-dev zlib1g-dev \
 && make buildcni
 
-FROM public.ecr.aws/docker/library/golang:1.20-alpine@sha256:ebceb16dc094769b6e2a393d51e0417c19084ba20eb8967fb3f7675c32b45774 AS dpbuilder
+FROM docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 AS dpbuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
-RUN apk add --no-cache build-base~=0.5-r3 \
-&& apk add --no-cache libbsd-dev~=0.11.7 \
-&& apk add --no-cache libxdp-dev~=1.2.10-r0 \
-&& apk add --no-cache libbpf-dev~=1.0.1-r0 \
-&& apk add --no-cache llvm15~=15.0.7-r0 \
-&& apk add --no-cache clang15~=15.0.7-r0 \
-&& apk add --no-cache \
+RUN apk add --no-cache build-base \
+&& apk add --no-cache libbsd-dev \
+&& apk add --no-cache libxdp-dev \
+&& apk add --no-cache libbpf-dev \
+&& apk add --no-cache llvm \
+&& apk add --no-cache clang \
 && make builddp
 
-FROM public.ecr.aws/docker/library/alpine:3.18@sha256:25fad2a32ad1f6f510e528448ae1ec69a28ef81916a004d3629874104f8a7f70
-RUN apk --no-cache -U add iproute2-rdma~=6.3.0-r0 acl~=2.3 \
-      && apk add --no-cache xdp-tools~=1.2.10-r0
+FROM docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+RUN apk --no-cache -U add iproute2-rdma acl \
+      && apk add --no-cache xdp-tools
 COPY --from=cnibuilder /usr/src/afxdp_k8s_plugins/bin/afxdp /afxdp/afxdp
 COPY --from=dpbuilder /usr/src/afxdp_k8s_plugins/bin/afxdp-dp /afxdp/afxdp-dp
 COPY --from=dpbuilder /usr/src/afxdp_k8s_plugins/images/entrypoint.sh /afxdp/entrypoint.sh

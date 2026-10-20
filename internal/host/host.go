@@ -82,9 +82,9 @@ func (r *handler) HasLibxdp() (bool, []string, error) {
 		files, err := os.ReadDir(path)
 		if err != nil {
 			if strings.Contains(err.Error(), "no such file or directory") {
-				logging.Debugf("Directory " + path + " does not exist")
+				logging.Debugf("Directory %s does not exist", path)
 			} else {
-				logging.Errorf("Error checking path "+path+": %v", err)
+				logging.Errorf("Error checking path %s: %v", path, err)
 				return false, nil, err
 			}
 		}

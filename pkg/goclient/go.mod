@@ -1,3 +1,3 @@
 module github.com/redhat-et/afxdp-plugins-for-kubernetes/pkg/goclient
 
-go 1.13
+go 1.25

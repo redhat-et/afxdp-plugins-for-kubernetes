@@ -16,13 +16,14 @@
 package resourcesapi
 
 import (
+	"context"
+	"net"
+	"time"
+
 	logging "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	api "k8s.io/kubelet/pkg/apis/podresources/v1"
-	"net"
-	"time"
 )
 
 const (

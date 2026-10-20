@@ -266,7 +266,7 @@ func checkHost(host host.Handler) (bool, error) {
 	if bpfInstalled {
 		logging.Debugf("Libbpf found on host:")
 		for _, lib := range libs {
-			logging.Debugf("\t" + lib)
+			logging.Debug("\t" + lib)
 		}
 	} else {
 		logging.Warningf("Libbpf not found on host")

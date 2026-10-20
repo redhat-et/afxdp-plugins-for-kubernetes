@@ -134,7 +134,7 @@ func (pm *PoolManager) Terminate() error {
 	if err := pm.cleanup(); err != nil {
 		logging.Errorf("Cleanup error: %v", err)
 	}
-	logging.Infof(pm.DevicePrefix + "/" + pm.Name + " terminated")
+	logging.Infof("%s/%s terminated", pm.DevicePrefix, pm.Name)
 
 	if pm.DpCniSyncerServer != nil {
 		pm.DpCniSyncerServer.StopGRPCSyncer()

@@ -32,7 +32,7 @@ build() {
 	echo "*****************************************************"
 	echo
 	echo "installing go-fuzz"
-	go get -u github.com/dvyukov/go-fuzz/go-fuzz@latest github.com/dvyukov/go-fuzz/go-fuzz-build@latest
+	go get github.com/dvyukov/go-fuzz/go-fuzz@e577bee5275c42f9a3ff598ade77fe9806191345 github.com/dvyukov/go-fuzz/go-fuzz-build@e577bee5275c42f9a3ff598ade77fe9806191345
 	echo
 	echo "building test app"
 	go-fuzz-build
