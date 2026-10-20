@@ -57,7 +57,7 @@ buildc:
 builddp: buildc buildxdp
 	@echo "******     Build DP      ******"
 	@echo
-	go build -o ./bin/afxdp-dp ./cmd/deviceplugin
+	go build -ldflags="-extldflags=-static" -tags netgo -o ./bin/afxdp-dp ./cmd/deviceplugin
 	@echo
 	@echo
 
