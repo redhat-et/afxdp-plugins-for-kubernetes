@@ -15,14 +15,14 @@
 # Bookworm rather than trixie: trixie's elfutils (0.192) ships a libelf.a that
 # references eu_search_tree_* symbols provided by no trixie package, which
 # breaks static linking of the CNI.
-FROM docker.io/library/golang:1.25-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS cnibuilder
+FROM public.ecr.aws/docker/library/golang:1.25-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS cnibuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 RUN apt-get update \
 && apt-get -y install --no-install-recommends libxdp-dev zlib1g-dev \
 && make buildcni
 
-FROM docker.io/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 AS dpbuilder
+FROM public.ecr.aws/docker/library/golang:1.25-alpine@sha256:1ae0735f00daffa3aaf1363a5184c0d2dc55c78e3db4ec70241cdac97bf84b59 AS dpbuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
 RUN apk add --no-cache build-base \
@@ -33,7 +33,7 @@ RUN apk add --no-cache build-base \
 && apk add --no-cache clang \
 && make builddp
 
-FROM docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+FROM public.ecr.aws/docker/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
 RUN apk --no-cache -U add iproute2-rdma acl \
       && apk add --no-cache xdp-tools
 COPY --from=cnibuilder /usr/src/afxdp_k8s_plugins/bin/afxdp /afxdp/afxdp
