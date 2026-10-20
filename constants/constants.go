@@ -183,7 +183,7 @@ type plugins struct {
 }
 
 type afxdp struct {
-	MinumumKernel string
+	MinimumKernel string
 }
 
 type drivers struct {
@@ -262,7 +262,7 @@ type bpfmanConf struct {
 	CsiDriverName          string
 	CsiMapPodPath          string
 	CsiMapName             string
-	MinumumKernel          string
+	MinimumKernel          string
 }
 
 type handshake struct {
@@ -310,7 +310,7 @@ func init() {
 	}
 
 	Afxdp = afxdp{
-		MinumumKernel: afxdpMinimumLinux,
+		MinimumKernel: afxdpMinimumLinux,
 	}
 
 	Drivers = drivers{
@@ -405,7 +405,7 @@ func init() {
 		CsiDriverName:          bpfmanCsiDriverName,
 		CsiMapPodPath:          bpfmanCsiMapPodPath,
 		CsiMapName:             bpfmanCsiMapName,
-		MinumumKernel:          bpfmanMinimumLinux,
+		MinimumKernel:          bpfmanMinimumLinux,
 	}
 
 	EthtoolFilter = ethtoolFilter{

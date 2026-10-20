@@ -134,6 +134,9 @@ interface. The program is identified by the bpfman.io/ProgramName metadata
 so that the bpfman CSI driver can expose its maps to pods.
 */
 func (c *client) LoadAndAttachXDP(ctx context.Context, opts XDPLoadOptions) (*XDPProgram, error) {
+	if opts.ProgramName == "" {
+		return nil, fmt.Errorf("program name is required")
+	}
 	if opts.FunctionName == "" || opts.Iface == "" {
 		return nil, fmt.Errorf("function name and interface are required")
 	}
@@ -144,6 +147,9 @@ func (c *client) LoadAndAttachXDP(ctx context.Context, opts XDPLoadOptions) (*XD
 	metadata := map[string]string{
 		MetadataKeyProgramName: opts.ProgramName,
 		MetadataKeyOwner:       OwnerValue,
+	}
+	for k, v := range ConfigMetadata(opts) {
+		metadata[k] = v
 	}
 	for k, v := range opts.ExtraMetadata {
 		metadata[k] = v

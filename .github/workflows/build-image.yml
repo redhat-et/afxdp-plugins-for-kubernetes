@@ -39,7 +39,7 @@ jobs:
             LABEL: latest
           - IMAGE_NAME: xdp-afxdp-redirect
             IMAGE_FILE: ./images/bytecode-redirect.dockerfile
-            PLATFORMS: linux/amd64
+            PLATFORMS: linux/amd64,linux/arm64
             LABEL: latest
 
     steps:

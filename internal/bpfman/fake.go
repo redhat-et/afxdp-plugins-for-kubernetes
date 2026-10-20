@@ -39,6 +39,8 @@ type FakeHandler struct {
 	UnloadError error
 	// ListError, if set, is returned by ListXDPPrograms.
 	ListError error
+	// LoadErrorForIface, if set for an interface name, is returned by LoadAndAttachXDP for that iface.
+	LoadErrorForIface map[string]error
 	// Closed records whether Close was called.
 	Closed bool
 }
@@ -64,10 +66,16 @@ func (f *FakeHandler) LoadAndAttachXDP(_ context.Context, opts XDPLoadOptions) (
 	if f.LoadError != nil {
 		return nil, f.LoadError
 	}
+	if f.LoadErrorForIface != nil {
+		if err := f.LoadErrorForIface[opts.Iface]; err != nil {
+			return nil, err
+		}
+	}
 
 	f.NextID++
 	id := f.NextID
-	f.Programs[id] = &opts
+	stored := opts
+	f.Programs[id] = &stored
 	f.AttachedIfaces[id] = opts.Iface
 
 	return &XDPProgram{
@@ -112,6 +120,9 @@ func (f *FakeHandler) ListXDPPrograms(_ context.Context, matchMetadata map[strin
 		m := map[string]string{
 			MetadataKeyProgramName: opts.ProgramName,
 			MetadataKeyOwner:       OwnerValue,
+		}
+		for k, v := range ConfigMetadata(*opts) {
+			m[k] = v
 		}
 		for k, v := range opts.ExtraMetadata {
 			m[k] = v

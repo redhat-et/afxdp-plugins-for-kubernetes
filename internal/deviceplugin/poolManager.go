@@ -240,6 +240,15 @@ func (pm *PoolManager) initBpfman() error {
 	for _, program := range programs {
 		device := program.Metadata[bpfman.MetadataKeyDevice]
 		if _, ok := pm.Devices[device]; ok {
+			expected := pm.bpfmanLoadOptions(device)
+			if !bpfman.ConfigMatchesMetadata(expected, program.Metadata) {
+				logging.Infof("bpfman program %d for device %s does not match pool configuration, unloading for reload",
+					program.ID, device)
+				if err := pm.BpfmanHandler.Unload(ctx, program.ID); err != nil {
+					logging.Errorf("Error unloading mismatched bpfman program %d: %v", program.ID, err)
+				}
+				continue
+			}
 			logging.Infof("Adopting existing bpfman program %d for device %s", program.ID, device)
 			pm.bpfmanPrograms[device] = program.ID
 		} else {
@@ -251,6 +260,7 @@ func (pm *PoolManager) initBpfman() error {
 	}
 
 	// Load and attach the program on every device that does not have one.
+	var loadedThisInit []uint32
 	for deviceName := range pm.Devices {
 		if pm.bpfmanPrograms[deviceName] != 0 {
 			continue
@@ -260,15 +270,32 @@ func (pm *PoolManager) initBpfman() error {
 		program, err := pm.BpfmanHandler.LoadAndAttachXDP(ctx, pm.bpfmanLoadOptions(deviceName))
 		if err != nil {
 			logging.Errorf("Error loading bpfman XDP program on device %s: %v", deviceName, err)
+			pm.rollbackBpfmanLoads(ctx, loadedThisInit)
 			return err
 		}
 		logging.Infof("bpfman XDP program loaded on: %s, program ID: %d, map pin path: %s",
 			deviceName, program.ID, program.MapPinPath)
 
 		pm.bpfmanPrograms[deviceName] = program.ID
+		loadedThisInit = append(loadedThisInit, program.ID)
 	}
 
 	return nil
+}
+
+func (pm *PoolManager) rollbackBpfmanLoads(ctx context.Context, programIDs []uint32) {
+	for _, id := range programIDs {
+		if err := pm.BpfmanHandler.Unload(ctx, id); err != nil {
+			logging.Errorf("Error rolling back bpfman program %d: %v", id, err)
+			continue
+		}
+		for deviceName, programID := range pm.bpfmanPrograms {
+			if programID == id {
+				delete(pm.bpfmanPrograms, deviceName)
+				break
+			}
+		}
+	}
 }
 
 /*
@@ -481,9 +508,12 @@ func (pm *PoolManager) Allocate(ctx context.Context,
 			case "primary":
 				logging.Debugf("Primary mode")
 			case "cdq":
-				if err := device.ActivateCdqSubfunction(); err != nil {
-					logging.Errorf("Error creating CDQ subfunction: %v", err)
-					return &response, err
+				// Subfunctions are activated for the pool in initBpfman(); skip here.
+				if !pm.BpfmanEnable {
+					if err := device.ActivateCdqSubfunction(); err != nil {
+						logging.Errorf("Error creating CDQ subfunction: %v", err)
+						return &response, err
+					}
 				}
 			default:
 				err := fmt.Errorf("unsupported pool mode: %s", pm.Mode)

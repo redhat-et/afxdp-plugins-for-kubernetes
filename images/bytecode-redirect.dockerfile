@@ -22,22 +22,28 @@
 # The object is built in the first stage (same flags as
 # internal/bpf/xdp-afxdp-redirect/Makefile) so the image builds from a clean
 # checkout. Override the XSKMAP size by changing XSK_MAP_MAX_ENTRIES in both
-# places. Currently single-architecture (amd64): the object is arch-specific
-# through its BTF.
+# places. Multi-arch (linux/amd64, linux/arm64): the object is arch-specific
+# through its BTF; build with buildx --platform linux/amd64,linux/arm64.
 #
 # Build and push:
 #   make bytecode-push BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
 FROM ubuntu:24.04 AS builder
+ARG TARGETARCH
 RUN apt-get update && \
     apt-get install -y --no-install-recommends clang libbpf-dev linux-libc-dev && \
     rm -rf /var/lib/apt/lists/*
 COPY internal/bpf/xdp-afxdp-redirect/xdp_afxdp_redirect.c /src/
 # Linux UAPI headers live in the multiarch include directory; -target bpf
-# drops it from clang's default search path
-RUN clang -target bpf \
+# drops it from clang's default search path.
+RUN case "${TARGETARCH}" in \
+        amd64) ARCH_INCLUDE=/usr/include/x86_64-linux-gnu ;; \
+        arm64) ARCH_INCLUDE=/usr/include/aarch64-linux-gnu ;; \
+        *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    clang -target bpf \
         -D __BPF_TRACING__ \
         -I/usr/include/bpf \
-        -I/usr/include/x86_64-linux-gnu \
+        -I"${ARCH_INCLUDE}" \
         -Wall -Wno-unused-value -Wno-pointer-sign -Wno-compare-distinct-pointer-types \
         -O2 -g -DBPFMAN -DXSK_MAP_MAX_ENTRIES=64 \
         -c /src/xdp_afxdp_redirect.c -o /xdp_afxdp_redirect_bpfman.o

@@ -437,6 +437,7 @@ func TestInitBpfman(t *testing.T) {
 			FunctionName:  "xdp_afxdp_redirect",
 			ProgramName:   "afxdp-myPool-dev_1",
 			Iface:         "dev_1",
+			Priority:      10,
 			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
 		})
 		require.NoError(t, err)
@@ -447,6 +448,7 @@ func TestInitBpfman(t *testing.T) {
 			FunctionName:  "xdp_afxdp_redirect",
 			ProgramName:   "afxdp-myPool-dev_gone",
 			Iface:         "dev_gone",
+			Priority:      10,
 			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_gone"},
 		})
 		require.NoError(t, err)
@@ -461,6 +463,45 @@ func TestInitBpfman(t *testing.T) {
 		assert.False(t, stillLoaded, "orphaned program should be unloaded")
 
 		assert.Len(t, fake.Programs, 2)
+	})
+
+	t.Run("reloads programs with mismatched configuration", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+
+		stale, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/old.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_1",
+			Iface:         "dev_1",
+			Priority:      10,
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
+		})
+		require.NoError(t, err)
+
+		pm.BpfmanHandler = fake
+		require.NoError(t, pm.initBpfman())
+
+		_, staleStillLoaded := fake.Programs[stale.ID]
+		assert.False(t, staleStillLoaded, "stale program should be unloaded")
+		assert.Len(t, fake.Programs, 2)
+		opts := fake.Programs[pm.bpfmanPrograms["dev_1"]]
+		require.NotNil(t, opts)
+		assert.Equal(t, "/afxdp/xdp_afxdp_redirect_bpfman.o", opts.BytecodeFile)
+	})
+
+	t.Run("rolls back loads when a device fails", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+		fake.LoadErrorForIface = map[string]error{
+			"dev_2": errors.New("bpfman unavailable"),
+		}
+		pm.BpfmanHandler = fake
+
+		err := pm.initBpfman()
+		require.Error(t, err)
+		assert.Empty(t, pm.bpfmanPrograms, "failed init should not leave tracked programs")
+		assert.Empty(t, fake.Programs, "failed init should roll back newly loaded programs")
 	})
 }
 

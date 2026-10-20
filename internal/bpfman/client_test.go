@@ -250,6 +250,13 @@ func TestLoadAndAttachXDPValidation(t *testing.T) {
 	_, err = handler.LoadAndAttachXDP(ctx, XDPLoadOptions{
 		BytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
 		FunctionName: "xdp_afxdp_redirect",
+		Iface:        "ens1",
+	})
+	assert.Error(t, err, "expected error when program name is missing")
+
+	_, err = handler.LoadAndAttachXDP(ctx, XDPLoadOptions{
+		BytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+		FunctionName: "xdp_afxdp_redirect",
 	})
 	assert.Error(t, err, "expected error when iface is missing")
 

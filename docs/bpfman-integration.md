@@ -67,8 +67,12 @@ new deployments.
    via bpfman and deletes eagerly-created CDQ subfunctions.
 
 5. **Device plugin restart**: the plugin lists bpfman programs carrying its
-   owner/pool metadata, adopts the programs whose devices are still in the pool,
-   and unloads any orphans.
+   owner/pool metadata, adopts programs whose devices are still in the pool and
+   whose bytecode source, function name, and priority match the current pool
+   configuration (`afxdp.io/bytecode-*`, `afxdp.io/function`, `afxdp.io/priority`
+   metadata), unloads mismatched programs for reload, and unloads any orphans.
+   If loading fails partway through pool start, programs loaded in that attempt
+   are rolled back before the pool registers with kubelet.
 
 ### Why the program follows the pool lifecycle
 
