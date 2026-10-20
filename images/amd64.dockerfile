@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM docker.io/library/golang:1.25@sha256:2c7ebcaf2c1032b4b4d15df14b7edf3221b1e45dadfaa36ab6a2f8555feacaa6 AS cnibuilder
+# Bookworm rather than trixie: trixie's elfutils (0.192) ships a libelf.a that
+# references eu_search_tree_* symbols provided by no trixie package, which
+# breaks static linking of the CNI.
+FROM docker.io/library/golang:1.25-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS cnibuilder
 COPY . /usr/src/afxdp_k8s_plugins
 WORKDIR /usr/src/afxdp_k8s_plugins
-# libdw-dev and libzstd-dev are required for static linking against Debian trixie's
-# newer elfutils (0.191+) where libelf.a references eu_search_tree_* and ZSTD symbols.
 RUN apt-get update \
-&& apt-get -y install --no-install-recommends libxdp-dev libdw-dev libzstd-dev \
-&& apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends clang \
-&& apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends llvm \
-&& apt-get -y install -o APT::Keep-Downloaded-Packages=false --no-install-recommends gcc-multilib \
-&& sed -i 's|LDFLAGS: -L. -lxdp -lbpf -lelf -lz|LDFLAGS: -L. -lxdp -lbpf -lelf -lz -lzstd -ldw|' internal/bpf/bpfWrapper.go \
+&& apt-get -y install --no-install-recommends libxdp-dev zlib1g-dev \
 && make buildcni
 
 FROM docker.io/library/golang:1.25-alpine@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587 AS dpbuilder

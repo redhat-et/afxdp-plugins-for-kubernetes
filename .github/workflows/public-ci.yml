@@ -24,11 +24,10 @@ jobs:
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LINTER_RULES_PATH: /
+          # Only the linters listed below run. Go linting runs in the
+          # go-static-tools job instead: internal/bpf needs libxdp (cgo),
+          # which is not available inside the super-linter container.
           VALIDATE_BASH: true
-          # Go linting runs in the go-static-tools job: internal/bpf needs
-          # libxdp (cgo), which is not available inside the super-linter
-          # container.
-          VALIDATE_GO: false
           VALIDATE_DOCKERFILE_HADOLINT: true
           VALIDATE_CLANG_FORMAT: true
           VALIDATE_JSON: true
