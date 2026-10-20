@@ -84,15 +84,25 @@ image: image-builder-check ## Build container image
 BYTECODE_IMAGE ?= quay.io/afxdp-plugins-for-kubernetes/xdp-afxdp-redirect
 BYTECODE_TAG ?= latest
 
+# Local bytecode builds target a single platform: multi-platform images cannot
+# be loaded into the local image store. Defaults to the build host's platform;
+# override with e.g. BYTECODE_PLATFORM=linux/amd64.
+BYTECODE_PLATFORM ?= linux/$(shell uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+# Platforms of the multi-arch image built and pushed by bytecode-push.
 BYTECODE_PLATFORMS ?= linux/amd64,linux/arm64
 
 .PHONY: bytecode-image
-bytecode-image: image-builder-check ## Build the XDP redirect bytecode OCI image (bpfman-compatible, amd64+arm64)
-	$(CTR_CMD) build --platform $(BYTECODE_PLATFORMS) -t $(BYTECODE_IMAGE):$(BYTECODE_TAG) -f images/bytecode-redirect.dockerfile .
+bytecode-image: image-builder-check ## Build the XDP redirect bytecode OCI image (bpfman-compatible, host platform)
+	$(CTR_CMD) build --platform $(BYTECODE_PLATFORM) -t $(BYTECODE_IMAGE):$(BYTECODE_TAG) -f images/bytecode-redirect.dockerfile .
 
 .PHONY: bytecode-push
 bytecode-push: image-builder-check ## Build and push a multi-arch XDP redirect bytecode OCI image
+ifneq ($(findstring podman,$(CTR_CMD)),)
+	$(CTR_CMD) build --manifest $(BYTECODE_IMAGE):$(BYTECODE_TAG) --platform $(BYTECODE_PLATFORMS) -f images/bytecode-redirect.dockerfile . && \
+	$(CTR_CMD) manifest push $(BYTECODE_IMAGE):$(BYTECODE_TAG)
+else
 	$(CTR_CMD) buildx build --platform $(BYTECODE_PLATFORMS) -t $(BYTECODE_IMAGE):$(BYTECODE_TAG) -f images/bytecode-redirect.dockerfile --push .
+endif
 
 ##@ Deployment - assumes K8s environment is already setup
 undeploy: ## Undeploy the Deamonset

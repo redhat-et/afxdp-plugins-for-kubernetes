@@ -31,6 +31,8 @@ jobs:
       packages: write
     strategy:
       fail-fast: false
+      # Build one image at a time to reduce anonymous ECR Public pull rate limits.
+      max-parallel: 1
       matrix:
         include:
           - IMAGE_NAME: afxdp-device-plugin
@@ -58,6 +60,18 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Pre-pull ECR Public base images
+        if: matrix.IMAGE_NAME == 'afxdp-device-plugin'
+        uses: nick-fields/retry@ce71cc2a7642dacbe1aa121138346450f155aa88 # v3.0.0
+        with:
+          timeout_minutes: 15
+          max_attempts: 5
+          retry_wait_seconds: 90
+          command: |
+            docker pull public.ecr.aws/docker/library/golang:1.25@sha256:2c7ebcaf2c1032b4b4d15df14b7edf3221b1e45dadfaa36ab6a2f8555feacaa6
+            docker pull public.ecr.aws/docker/library/golang:1.25-alpine@sha256:56961d79ea8129efddcc0b8643fd8a5416b4e6228cfd477e3fd61deb2672c587
+            docker pull public.ecr.aws/docker/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 
       - name: Set up cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3

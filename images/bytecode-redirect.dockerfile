@@ -23,9 +23,11 @@
 # internal/bpf/xdp-afxdp-redirect/Makefile) so the image builds from a clean
 # checkout. Override the XSKMAP size by changing XSK_MAP_MAX_ENTRIES in both
 # places. Multi-arch (linux/amd64, linux/arm64): the object is arch-specific
-# through its BTF; build with buildx --platform linux/amd64,linux/arm64.
+# through its BTF.
 #
-# Build and push:
+# Build locally (single platform, defaults to the host platform):
+#   make bytecode-image BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
+# Build and push multi-arch (amd64+arm64):
 #   make bytecode-push BYTECODE_IMAGE=quay.io/<org>/xdp-afxdp-redirect
 FROM ubuntu:24.04 AS builder
 ARG TARGETARCH

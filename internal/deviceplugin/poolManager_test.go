@@ -503,6 +503,68 @@ func TestInitBpfman(t *testing.T) {
 		assert.Empty(t, pm.bpfmanPrograms, "failed init should not leave tracked programs")
 		assert.Empty(t, fake.Programs, "failed init should roll back newly loaded programs")
 	})
+
+	t.Run("fails when unloading a mismatched program fails", func(t *testing.T) {
+		pm := NewPoolManager(newConfig())
+		fake := bpfman.NewFakeHandler()
+
+		_, err := fake.LoadAndAttachXDP(context.Background(), bpfman.XDPLoadOptions{
+			BytecodeFile:  "/afxdp/old.o",
+			FunctionName:  "xdp_afxdp_redirect",
+			ProgramName:   "afxdp-myPool-dev_1",
+			Iface:         "dev_1",
+			Priority:      10,
+			ExtraMetadata: map[string]string{bpfman.MetadataKeyPool: "myPool", bpfman.MetadataKeyDevice: "dev_1"},
+		})
+		require.NoError(t, err)
+
+		fake.UnloadError = errors.New("bpfman unavailable")
+		pm.BpfmanHandler = fake
+
+		err = pm.initBpfman()
+		require.Error(t, err)
+		assert.Len(t, fake.Programs, 1, "stale program should remain loaded when its unload fails")
+		assert.Empty(t, pm.bpfmanPrograms, "no programs should be tracked when init fails")
+	})
+
+	t.Run("removes CDQ subfunctions when init fails", func(t *testing.T) {
+		netHandler := &deleteRecordingHandler{FakeHandler: networking.NewFakeHandler()}
+		primary := networking.CreateTestDevice("ens1f0", "cdq", "ice", "0000:81:00.1", "68:05:ca:2d:e9:01", netHandler)
+
+		pm := NewPoolManager(PoolConfig{
+			Name: "myPool",
+			Mode: "cdq",
+			Devices: map[string]*networking.Device{
+				"ens1f0sf1": networking.CreateTestSubfunction(primary, "ens1f0sf1"),
+			},
+			BpfmanEnable:       true,
+			BpfmanBytecodeFile: "/afxdp/xdp_afxdp_redirect_bpfman.o",
+			BpfmanFunction:     "xdp_afxdp_redirect",
+			BpfmanPriority:     10,
+		})
+		pm.NetHandler = netHandler
+
+		fake := bpfman.NewFakeHandler()
+		fake.LoadError = errors.New("bpfman unavailable")
+		pm.BpfmanHandler = fake
+
+		require.Error(t, pm.initBpfman())
+		assert.Len(t, netHandler.deletedPortIndexes, 1, "CDQ subfunction should be deleted when init fails")
+	})
+}
+
+/*
+deleteRecordingHandler wraps the networking fake handler and records
+DeleteCdqSubfunction calls.
+*/
+type deleteRecordingHandler struct {
+	networking.FakeHandler
+	deletedPortIndexes []string
+}
+
+func (h *deleteRecordingHandler) DeleteCdqSubfunction(portIndex string) error {
+	h.deletedPortIndexes = append(h.deletedPortIndexes, portIndex)
+	return nil
 }
 
 func TestTerminateBpfman(t *testing.T) {

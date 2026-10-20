@@ -72,7 +72,8 @@ new deployments.
    configuration (`afxdp.io/bytecode-*`, `afxdp.io/function`, `afxdp.io/priority`
    metadata), unloads mismatched programs for reload, and unloads any orphans.
    If loading fails partway through pool start, programs loaded in that attempt
-   are rolled back before the pool registers with kubelet.
+   are rolled back and any eagerly-created CDQ subfunctions are deleted before
+   the pool registers with kubelet.
 
 ### Why the program follows the pool lifecycle
 

@@ -204,7 +204,7 @@ volume mount and that idle pooled devices simply pass traffic to the stack
 (the redirect program falls back to XDP_PASS when no AF_XDP socket is
 inserted into the map).
 */
-func (pm *PoolManager) initBpfman() error {
+func (pm *PoolManager) initBpfman() (err error) {
 	ctx := context.Background()
 
 	if pm.BpfmanHandler == nil {
@@ -217,8 +217,15 @@ func (pm *PoolManager) initBpfman() error {
 
 	// In cdq mode the subfunctions must exist on the host before their XDP
 	// programs can be attached, so activate them eagerly rather than at
-	// Allocate time.
+	// Allocate time. If init fails past this point the pool is not yet
+	// registered with Kubelet, so nothing can be using the subfunctions:
+	// remove any that were created.
 	if pm.Mode == "cdq" {
+		defer func() {
+			if err != nil {
+				pm.deactivateCdqSubfunctions()
+			}
+		}()
 		for _, device := range pm.Devices {
 			if err := device.ActivateCdqSubfunction(); err != nil {
 				logging.Errorf("Error activating CDQ subfunction %s: %v", device.Name(), err)
@@ -246,6 +253,7 @@ func (pm *PoolManager) initBpfman() error {
 					program.ID, device)
 				if err := pm.BpfmanHandler.Unload(ctx, program.ID); err != nil {
 					logging.Errorf("Error unloading mismatched bpfman program %d: %v", program.ID, err)
+					return fmt.Errorf("error unloading mismatched bpfman program %d for device %s: %w", program.ID, device, err)
 				}
 				continue
 			}
@@ -313,28 +321,37 @@ func (pm *PoolManager) terminateBpfman() {
 		}
 	}
 
-	// In bpfman mode the CNI does not delete CDQ subfunctions at pod
-	// teardown, so clean them up here.
-	if pm.Mode == "cdq" {
-		for _, device := range pm.Devices {
-			if isSf, err := pm.NetHandler.IsCdqSubfunction(device.Name()); err != nil {
-				logging.Errorf("Error determining if %s is a CDQ subfunction: %v", device.Name(), err)
-			} else if isSf {
-				portIndex, err := pm.NetHandler.GetCdqPortIndex(device.Name())
-				if err != nil {
-					logging.Errorf("Error getting port index of device %s: %v", device.Name(), err)
-					continue
-				}
-				if err := pm.NetHandler.DeleteCdqSubfunction(portIndex); err != nil {
-					logging.Errorf("Error deleting CDQ subfunction %s: %v", device.Name(), err)
-				}
-			}
-		}
-	}
+	pm.deactivateCdqSubfunctions()
 
 	if pm.BpfmanHandler != nil {
 		if err := pm.BpfmanHandler.Close(); err != nil {
 			logging.Errorf("Error closing bpfman client: %v", err)
+		}
+	}
+}
+
+/*
+deactivateCdqSubfunctions deletes the pool's CDQ subfunctions from the host.
+In bpfman mode the CNI does not delete CDQ subfunctions at pod teardown, so
+the plugin removes them when the pool terminates or fails to start.
+*/
+func (pm *PoolManager) deactivateCdqSubfunctions() {
+	if pm.Mode != "cdq" {
+		return
+	}
+
+	for _, device := range pm.Devices {
+		if isSf, err := pm.NetHandler.IsCdqSubfunction(device.Name()); err != nil {
+			logging.Errorf("Error determining if %s is a CDQ subfunction: %v", device.Name(), err)
+		} else if isSf {
+			portIndex, err := pm.NetHandler.GetCdqPortIndex(device.Name())
+			if err != nil {
+				logging.Errorf("Error getting port index of device %s: %v", device.Name(), err)
+				continue
+			}
+			if err := pm.NetHandler.DeleteCdqSubfunction(portIndex); err != nil {
+				logging.Errorf("Error deleting CDQ subfunction %s: %v", device.Name(), err)
+			}
 		}
 	}
 }

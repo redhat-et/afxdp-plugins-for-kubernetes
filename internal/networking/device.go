@@ -439,3 +439,19 @@ func CreateTestDevice(name string, mode string, driver string, pci string, macAd
 
 	return dev
 }
+
+/*
+CreateTestSubfunction returns a secondary device associated with the given
+primary and is intended for unit testing purposes only
+This function should not be used outside of testing
+Devices should always be created via a net handler
+*/
+func CreateTestSubfunction(primary *Device, name string) *Device {
+	return &Device{
+		name:       name,
+		mode:       primary.mode,
+		driver:     primary.driver,
+		primary:    primary,
+		netHandler: primary.netHandler,
+	}
+}
