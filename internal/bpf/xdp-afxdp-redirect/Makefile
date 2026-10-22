@@ -14,6 +14,10 @@
 LLC ?= llc
 CLANG ?= clang
 
+# Linux UAPI headers (asm/types.h & friends) live in the multiarch include
+# directory; -target bpf drops it from clang's default search path.
+ARCH_INCLUDES := $(wildcard /usr/include/x86_64-linux-gnu /usr/include/aarch64-linux-gnu /usr/include/s390x-linux-gnu /usr/include/powerpc64le-linux-gnu)
+
 all: afxdp_redirect
 
 afxdp_redirect:
@@ -21,6 +25,7 @@ afxdp_redirect:
 	-target bpf \
 	-D __BPF_TRACING__ \
 	-I/usr/include/bpf \
+	$(addprefix -I,$(ARCH_INCLUDES)) \
 	-Wall \
 	-Wno-unused-value \
 	-Wno-pointer-sign \
