@@ -17,6 +17,7 @@
 package deviceplugin
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -31,7 +32,6 @@ import (
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/tools"
 	"github.com/redhat-et/afxdp-plugins-for-kubernetes/internal/udsserver"
 	logging "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
